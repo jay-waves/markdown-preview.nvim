@@ -98,6 +98,7 @@ The preview opens a polished browser app with:
 require("markdown_preview").setup({
   instance_mode = "takeover",           -- "takeover" or "multi" (see below)
   port = 0,                             -- 0 = auto (8421 for takeover, OS-assigned for multi)
+  host = "127.0.0.1",                   -- bind address; "0.0.0.0" for network access (see Remote access)
   open_browser = true,                  -- auto-open browser on start
 
   -- nil = system default browser
@@ -174,6 +175,13 @@ require("markdown_preview").setup({
 ```
 
 The notification will show the full URL including the auth token (e.g. `http://10.0.0.5:8421/?t=...`). Most terminals support **Ctrl+Shift+click** on the URL to open it directly in your local browser.
+
+> **Security notes for network binding**
+>
+> - With a non-loopback `host`, the tokenized URL is required for *everything*, including the page itself — requests without `?t=<token>` get 401. Peers on your network cannot read your buffer without the URL.
+> - Traffic is plain, unencrypted HTTP. Anyone who obtains the URL (or can sniff the local network) can read the previewed buffer while the preview runs.
+> - Takeover mode supports `host = "127.0.0.1"` or `"0.0.0.0"` only. To bind a specific interface, use `instance_mode = "multi"`.
+> - Zero-config alternative: keep the default loopback bind and tunnel instead — `ssh -L 8421:localhost:8421 <remote>` — then open the URL printed by `on_start` locally, replacing the host with `127.0.0.1`. Nothing is exposed to the network, and traffic is encrypted by SSH.
 
 ### Instance modes
 

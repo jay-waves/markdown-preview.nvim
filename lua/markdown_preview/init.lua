@@ -87,6 +87,10 @@ local function effective_port()
 	return 0
 end
 
+local function host_is_loopback()
+	return M.config.host == "127.0.0.1" or M.config.host == "localhost"
+end
+
 ---------------------------------------------------------------------------
 -- Workspace
 ---------------------------------------------------------------------------
@@ -122,8 +126,11 @@ local function write_index(dir)
 	content = content:gsub("__MERMAID_ELK__", function() return M.config.mermaid_elk and "true" or "false" end)
 	-- Anchor to the attribute: index.html also contains the bare placeholder
 	-- as a JS sentinel, and substituting that too breaks auth (issue #31).
+	-- Bake the token only on loopback binds: on a network bind the index is
+	-- served to any peer that can reach the port, and a baked token would
+	-- defeat the auth entirely (the browser gets it via ?t= instead).
 	content = content:gsub('data%-live%-token="__LIVE_TOKEN__"', function()
-		return 'data-live-token="' .. (M._token or "") .. '"'
+		return 'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"'
 	end)
 	content = content:gsub("__THEME__", function() return M.config.default_theme end)
 
@@ -154,7 +161,8 @@ local function write_index_if_needed(dir)
 	end
 	-- A cached index baked with a previous session's token would 401 against
 	-- the current server, so rewrite whenever the baked token went stale.
-	if M._token and M._token ~= "" then
+	-- (Non-loopback binds never bake the token, so there is nothing to check.)
+	if host_is_loopback() and M._token and M._token ~= "" then
 		local ok, existing = pcall(util.read_text, dst)
 		if not ok or not existing:find(M._token, 1, true) then
 			return write_index(dir)
@@ -480,6 +488,19 @@ function M.start()
 	local bufnr = vim.api.nvim_get_current_buf()
 	M._active_bufnr = bufnr
 
+	-- Takeover coordination (lock probe + cross-instance events) talks to
+	-- 127.0.0.1, which a specific-interface bind does not answer on. Only
+	-- loopback and the wildcard are supported there; multi mode has no such
+	-- coupling and accepts any bind address.
+	if M.config.instance_mode == "takeover" and not host_is_loopback() and M.config.host ~= "0.0.0.0" then
+		vim.notify(
+			'Markdown Preview: takeover mode supports host = "127.0.0.1" or "0.0.0.0" only.\n'
+				.. 'Use "0.0.0.0" for LAN access, or instance_mode = "multi" to bind a specific interface.',
+			vim.log.levels.ERROR
+		)
+		return
+	end
+
 	local ok_content, text = pcall(get_content, bufnr)
 	if not ok_content then
 		vim.notify("Markdown Preview: " .. tostring(text), vim.log.levels.ERROR)
@@ -536,6 +557,16 @@ function M.start()
 	-- configured content_name so it's a literal match.
 	local content_path_pattern = "^/" .. M.config.content_name:gsub("%.", "%%.") .. "$"
 
+	local protected = { content_path_pattern }
+	if not host_is_loopback() then
+		-- On a network bind the index page must be gated too: it is the
+		-- browser's bootstrap document, and serving it openly would hand the
+		-- preview to any peer that can reach the port. The tokenized ?t= URL
+		-- (printed by hooks.on_start / opened by the browser) unlocks it.
+		table.insert(protected, "^/$")
+		table.insert(protected, "^/" .. M.config.index_name:gsub("%.", "%%.") .. "$")
+	end
+
 	-- Start live-server if not already running
 	if not M._server_instance then
 		local port = effective_port()
@@ -556,7 +587,7 @@ function M.start()
 			},
 			features = { dirlist = { enabled = false } },
 			token = M._token,
-			protected_paths = { content_path_pattern },
+			protected_paths = protected,
 		})
 		if not ok then
 			vim.notify(
