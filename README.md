@@ -272,6 +272,7 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - **Raw HTML is rendered by default** (GitHub-like). HTML embedded in markdown runs inside the preview page, so if you preview markdown you didn't write, set `allow_raw_html = false` to have it rendered as plain text instead.
 - **Browser libraries load from CDNs** (jsdelivr/unpkg, see *Dependencies*). Nothing from your machine is sent to them, but rendering requires internet access. Vendoring the assets locally is planned ([#27](https://github.com/selimacerbas/markdown-preview.nvim/issues/27)).
 - **`custom_css` files are inlined into the preview page** verbatim. Point it only at files you trust.
+- **Relative images are served from the previewed file's directory.** The token-gated asset route can serve *any* file at or below that directory (not just images), so on a non-loopback `host` anyone holding the tokenized URL could request other files there (`.env`, `secrets.txt`, …). Keep sensitive files out of the directory tree you preview from when binding to the network, or prefer an SSH tunnel.
 - The takeover-mode lock file (which contains the session token) is written with mode `0600`.
 
 ---

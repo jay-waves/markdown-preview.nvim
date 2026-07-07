@@ -177,14 +177,14 @@ local function write_index_if_needed(dir)
 	if not util.file_exists(dst) then
 		return write_index(dir)
 	end
-	-- A cached index baked with a previous session's token would 401 against
-	-- the current server, so rewrite whenever the baked token went stale.
-	-- (Non-loopback binds never bake the token, so there is nothing to check.)
-	if host_is_loopback() and M._token and M._token ~= "" then
-		local ok, existing = pcall(util.read_text, dst)
-		if not ok or not existing:find(M._token, 1, true) then
-			return write_index(dir)
-		end
+	-- Rewrite a persisted index whose baked token no longer matches what this
+	-- session serves. Covers a fresh token after restart AND a loopback<->
+	-- network switch (which flips whether the token is baked at all) — a stale
+	-- non-empty token on a network bind would otherwise 401 every request.
+	local want = 'data-live-token="' .. (host_is_loopback() and (M._token or "") or "") .. '"'
+	local ok, existing = pcall(util.read_text, dst)
+	if not ok or not existing:find(want, 1, true) then
+		return write_index(dir)
 	end
 	return dst
 end
@@ -355,8 +355,11 @@ local function get_content(bufnr)
 		text = "```mermaid\n" .. mermaid_text .. "\n```\n"
 	end
 
-	-- Pre-render mermaid blocks via mmdr if configured
-	if M.config.mermaid_renderer == "rust" and is_mmdr_available() then
+	-- Pre-render mermaid blocks via mmdr if configured. Skipped when raw HTML
+	-- is disabled: pre-rendering injects <svg> markup into content.md, which
+	-- markdown-it would escape to literal text under html:false. The browser-
+	-- side renderer handles the fences instead (it doesn't need raw HTML).
+	if M.config.mermaid_renderer == "rust" and M.config.allow_raw_html ~= false and is_mmdr_available() then
 		text = prerender_mermaid_blocks(text)
 	end
 
@@ -581,10 +584,10 @@ function M.start()
 
 	set_autocmds_for_buffer(bufnr)
 
-	-- Pattern matching the workspace-served content file. Used by live-server
-	-- to require ?t=<token> on requests for it. Escape any '.' in the
-	-- configured content_name so it's a literal match.
-	local content_path_pattern = "^/" .. M.config.content_name:gsub("%.", "%%.") .. "$"
+	-- Patterns matching workspace-served files that require ?t=<token>.
+	-- vim.pesc escapes every Lua-pattern magic char, so custom content_name /
+	-- index_name values containing '-', '+', '.', etc. still gate correctly.
+	local content_path_pattern = "^/" .. vim.pesc(M.config.content_name) .. "$"
 
 	-- The asset_root sidecar is gated too: it holds the source file's
 	-- directory path, which is nobody's business but ours.
@@ -595,7 +598,19 @@ function M.start()
 		-- preview to any peer that can reach the port. The tokenized ?t= URL
 		-- (printed by hooks.on_start / opened by the browser) unlocks it.
 		table.insert(protected, "^/$")
-		table.insert(protected, "^/" .. M.config.index_name:gsub("%.", "%%.") .. "$")
+		table.insert(protected, "^/" .. vim.pesc(M.config.index_name) .. "$")
+	end
+
+	-- Relative image support needs the asset route in live-server. The two
+	-- plugins are versioned independently, so warn (once) if the installed
+	-- live-server predates it — images will 404 until it's updated.
+	if not (ls_server.features and ls_server.features.asset_route) and not M._warned_no_asset_route then
+		M._warned_no_asset_route = true
+		vim.notify(
+			"Markdown Preview: relative images need a newer live-server.nvim (with the asset route).\n"
+				.. "Update live-server.nvim, or relative images will not load.",
+			vim.log.levels.WARN
+		)
 	end
 
 	-- Start live-server if not already running
