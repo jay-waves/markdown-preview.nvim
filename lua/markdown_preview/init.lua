@@ -374,9 +374,20 @@ local function get_content_safe(bufnr)
 	return nil
 end
 
-local function write_content(dir, text)
+local function write_content(dir, text, bufnr)
 	local path = vim.fs.joinpath(dir, M.config.content_name)
 	util.write_text(path, text)
+	-- Sidecar recording the source file's directory. The server's asset
+	-- route resolves relative image paths against it; using a file (rather
+	-- than server state) lets takeover secondaries retarget it by simply
+	-- writing into the shared workspace.
+	if bufnr then
+		local name = vim.api.nvim_buf_get_name(bufnr)
+		local src_dir = name ~= "" and vim.fs.dirname(name) or nil
+		if src_dir and src_dir ~= "" then
+			pcall(util.write_text, vim.fs.joinpath(dir, "asset_root"), src_dir)
+		end
+	end
 	return path
 end
 
@@ -397,7 +408,7 @@ local function maybe_refresh(bufnr, silent)
 	end
 
 	local dir = M._workspace_dir or ensure_workspace(bufnr)
-	write_content(dir, text)
+	write_content(dir, text, bufnr)
 	M._last_text_by_buf[bufnr] = text
 
 	-- Notify live-server of the content change for immediate SSE push
@@ -546,7 +557,7 @@ function M.start()
 			M._is_primary = false
 			M._takeover_port = lock_data.port
 			M._token = lock_data.token
-			write_content(dir, text)
+			write_content(dir, text, bufnr)
 			M._last_text_by_buf[bufnr] = text
 			set_autocmds_for_buffer(bufnr)
 			if type(M.config.hooks.on_start) == "function" then
@@ -565,7 +576,7 @@ function M.start()
 	end
 
 	write_index_if_needed(dir)
-	write_content(dir, text)
+	write_content(dir, text, bufnr)
 	M._last_text_by_buf[bufnr] = text
 
 	set_autocmds_for_buffer(bufnr)
@@ -575,7 +586,9 @@ function M.start()
 	-- configured content_name so it's a literal match.
 	local content_path_pattern = "^/" .. M.config.content_name:gsub("%.", "%%.") .. "$"
 
-	local protected = { content_path_pattern }
+	-- The asset_root sidecar is gated too: it holds the source file's
+	-- directory path, which is nobody's business but ours.
+	local protected = { content_path_pattern, "^/asset_root$" }
 	if not host_is_loopback() then
 		-- On a network bind the index page must be gated too: it is the
 		-- browser's bootstrap document, and serving it openly would hand the
@@ -606,6 +619,16 @@ function M.start()
 			features = { dirlist = { enabled = false } },
 			token = M._token,
 			protected_paths = protected,
+			-- Resolve relative image paths against the source file's dir
+			-- (issue #17). Read per request so takeover secondaries and
+			-- buffer switches retarget it via the sidecar.
+			asset_root = function()
+				local ws = M._workspace_dir
+				if not ws then return nil end
+				local ok_read, data = pcall(util.read_text, vim.fs.joinpath(ws, "asset_root"))
+				if not ok_read or not data or data == "" then return nil end
+				return (data:gsub("%s+$", ""))
+			end,
 		})
 		if not ok then
 			vim.notify(

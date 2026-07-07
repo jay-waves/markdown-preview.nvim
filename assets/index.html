@@ -1220,6 +1220,19 @@
         }
 
         // ── Copy button on code blocks ────────────────────────────────
+        // Relative image paths resolve against the served workspace, which
+        // only contains the rendered content — rewrite them to the token-
+        // gated asset route, which resolves against the source file's dir.
+        // Runs on the detached render tree BEFORE morphdom applies it, so
+        // raw-HTML <img> tags never fire an unrewritten (404) request.
+        function rewriteRelativeImages(rootEl) {
+            rootEl.querySelectorAll('img[src]').forEach(img => {
+                const src = img.getAttribute('src');
+                if (!src || /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|\/|#)/.test(src)) return;
+                img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(src)));
+            });
+        }
+
         function attachCopyButtons() {
             contentEl.querySelectorAll('.code-wrap').forEach(wrap => {
                 if (wrap.querySelector('.copy-btn')) return;
@@ -1287,6 +1300,7 @@
                     const wrapper = document.createElement('div');
                     wrapper.id = 'content';
                     wrapper.innerHTML = html;
+                    rewriteRelativeImages(wrapper);
 
                     window.morphdom(contentEl, wrapper, {
                         childrenOnly: false,
@@ -1312,6 +1326,7 @@
                     });
                 } else {
                     contentEl.innerHTML = html;
+                    rewriteRelativeImages(contentEl);
                 }
                 applyBottomPadding();
 

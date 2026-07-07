@@ -5,6 +5,7 @@
 Live **Markdown preview** for Neovim with first-class **Mermaid diagram** support.
 
 - Renders your entire `.md` file in the browser — headings, tables, code blocks, everything
+- **Relative images work** — `![](pic.png)` next to your `.md` file renders in the preview
 - **Mermaid diagrams** render inline as interactive SVGs (click to expand, zoom, pan, export)
 - **Instant updates** via Server-Sent Events (no polling) with **scroll sync** — browser follows your cursor
 - **LaTeX math** — inline `$...$` and display `$$...$$` rendered via KaTeX
@@ -282,6 +283,10 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - If no launcher works, a notification shows the preview URL — open it manually in your Windows browser.
 - If `http://127.0.0.1:8421/` is unreachable from Windows, WSL2's localhost forwarding has likely broken (common after sleep, hibernate, or VPN changes). Run `wsl --shutdown` from PowerShell and reopen WSL. Alternatively bind the server to all interfaces (`host = "0.0.0.0"`) and open the URL printed by `hooks.on_start` (see *Remote access*).
 - `explorer.exe`/`powershell.exe` require Windows interop; check `/etc/wsl.conf` for `[interop] enabled=false` or `appendWindowsPath=false`.
+
+**Images don't show**
+- Relative paths (`pic.png`, `images/pic.png`) are served from the directory of the file being previewed, via a token-gated asset route. Paths that resolve *outside* that directory (e.g. `../shared/pic.png`) are rejected for containment; keep referenced images at or below the markdown file's directory.
+- Absolute filesystem paths (`/home/me/pic.png`) are not supported; http(s) URLs load as usual.
 
 **Browser shows nothing or "Loading..."**
 - Make sure `live-server.nvim` is installed and loadable: `:lua require("live_server")`
