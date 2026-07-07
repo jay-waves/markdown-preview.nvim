@@ -277,6 +277,12 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 
 ## Troubleshooting
 
+**WSL: browser doesn't open, or preview unreachable from Windows**
+- The plugin tries `wslview`, `explorer.exe`, then `powershell.exe` to open your Windows browser. Installing [wslu](https://wslutiliti.es/wslu/) (`sudo apt install wslu`) is the most reliable option; you can also set `browser = "wslview"` explicitly.
+- If no launcher works, a notification shows the preview URL — open it manually in your Windows browser.
+- If `http://127.0.0.1:8421/` is unreachable from Windows, WSL2's localhost forwarding has likely broken (common after sleep, hibernate, or VPN changes). Run `wsl --shutdown` from PowerShell and reopen WSL. Alternatively bind the server to all interfaces (`host = "0.0.0.0"`) and open the URL printed by `hooks.on_start` (see *Remote access*).
+- `explorer.exe`/`powershell.exe` require Windows interop; check `/etc/wsl.conf` for `[interop] enabled=false` or `appendWindowsPath=false`.
+
 **Browser shows nothing or "Loading..."**
 - Make sure `live-server.nvim` is installed and loadable: `:lua require("live_server")`
 - Check the port isn't in use: change `port` in config
