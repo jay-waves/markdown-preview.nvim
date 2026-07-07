@@ -157,6 +157,24 @@ require("markdown_preview").setup({
 - **`on_start(url)`** — called after the server is ready, before the browser opens. Receives the preview URL as a string.
 - **`on_stop()`** — called after the server is stopped and all cleanup is done.
 
+### Remote access (SSH)
+
+If you're running Neovim on a remote machine over SSH and want to view the preview on your local machine, bind to all interfaces and use `on_start` to print the URL:
+
+```lua
+require("markdown_preview").setup({
+  host = "0.0.0.0",
+  open_browser = false,
+  hooks = {
+    on_start = function(url)
+      vim.notify("Markdown Preview: " .. url, vim.log.levels.INFO)
+    end,
+  },
+})
+```
+
+The notification will show the full URL including the auth token (e.g. `http://10.0.0.5:8421/?t=...`). Most terminals support **Ctrl+Shift+click** on the URL to open it directly in your local browser.
+
 ### Instance modes
 
 **Takeover** (default) — all Neovim instances share a single workspace and browser tab. The first instance to run `:MarkdownPreview` becomes the primary (starts the server on port 8421). Subsequent instances become secondaries — they write content to the shared workspace, and the server's file watcher pushes a reload to the browser. Scroll sync works across instances via HTTP event injection.
