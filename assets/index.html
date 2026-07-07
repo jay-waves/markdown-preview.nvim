@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__">
+<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__">
 
 <head>
     <meta charset="utf-8" />
@@ -1022,7 +1022,10 @@
             contentEl.innerHTML = '<p style="color:var(--err-fg)">Failed to load markdown-it from CDN. Check your internet connection.</p>';
         }
         const md = (window.markdownit || function () { return { render: (t) => '<pre>' + t + '</pre>', utils: { escapeHtml: (s) => s } }; })({
-            html: true,
+            // Raw HTML passthrough is configurable: untrusted markdown can
+            // otherwise inject handlers/scripts into this page. Defaults to
+            // enabled (GitHub-like) when the attribute is absent.
+            html: document.documentElement.dataset.allowHtml !== 'false',
             linkify: true,
             typographer: true,
             highlight: function (str, lang) {

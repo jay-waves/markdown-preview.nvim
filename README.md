@@ -127,6 +127,8 @@ require("markdown_preview").setup({
 
   yaml_mode = "panel",                  -- front matter: "panel" (collapsible above preview), "hide", or "raw"
 
+  allow_raw_html = true,                -- render raw HTML in markdown; set false for untrusted files (see Security)
+
   scroll_sync = true,                   -- browser follows cursor position
 
   -- Fraction (0–1): vertical position of the final line when scrolled to end.
@@ -260,6 +262,16 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - [Mermaid](https://mermaid.js.org/) — diagram engine
 - [highlight.js](https://highlightjs.org/) — syntax highlighting
 - [morphdom](https://github.com/patrick-steele-idem/morphdom) — DOM diffing
+
+---
+
+## Security
+
+- **Local by default.** The preview server binds to `127.0.0.1`. Your buffer content (`content.md`), the SSE stream, and the event-injection endpoint all require a per-session 128-bit token; with a non-loopback `host`, the preview page itself requires it too (see *Remote access* above).
+- **Raw HTML is rendered by default** (GitHub-like). HTML embedded in markdown runs inside the preview page, so if you preview markdown you didn't write, set `allow_raw_html = false` to have it rendered as plain text instead.
+- **Browser libraries load from CDNs** (jsdelivr/unpkg, see *Dependencies*). Nothing from your machine is sent to them, but rendering requires internet access. Vendoring the assets locally is planned ([#27](https://github.com/selimacerbas/markdown-preview.nvim/issues/27)).
+- **`custom_css` files are inlined into the preview page** verbatim. Point it only at files you trust.
+- The takeover-mode lock file (which contains the session token) is written with mode `0600`.
 
 ---
 

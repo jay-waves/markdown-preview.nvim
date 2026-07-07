@@ -50,6 +50,10 @@ M.config = {
 	-- "dark" or "light"; determines the initial theme of the preview page
 	default_theme = "dark",
 
+	-- Render raw HTML embedded in markdown (GitHub-like). Set false when
+	-- previewing untrusted markdown: raw HTML runs inside the preview page.
+	allow_raw_html = true,
+
 	-- YAML front matter (--- ... --- at the top of the file):
 	-- "panel" = strip it from the preview, show in a collapsible panel above
 	-- "hide"  = strip it entirely
@@ -139,6 +143,9 @@ local function write_index(dir)
 		return 'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"'
 	end)
 	content = content:gsub("__THEME__", function() return M.config.default_theme end)
+	content = content:gsub("__ALLOW_HTML__", function()
+		return M.config.allow_raw_html ~= false and "true" or "false"
+	end)
 	content = content:gsub("__YAML_MODE__", function()
 		local m = M.config.yaml_mode
 		if m ~= "hide" and m ~= "raw" then m = "panel" end
