@@ -474,9 +474,19 @@
             line-height: 1.55;
         }
 
+        /* Non-scrolling wrapper around fenced code: keeps the language badge
+           and copy button pinned while the <pre> scrolls horizontally */
+        #content .code-wrap {
+            position: relative;
+            margin: 0 0 1em;
+        }
+
+        #content .code-wrap pre {
+            margin: 0;
+        }
+
         /* Language badge on code blocks */
-        #content pre[data-lang]::before {
-            content: attr(data-lang);
+        #content .code-wrap .code-lang {
             position: absolute;
             top: 0;
             right: 0;
@@ -491,10 +501,12 @@
             letter-spacing: .5px;
             font-weight: 500;
             line-height: 1.4;
+            pointer-events: none;
+            z-index: 2;
         }
 
         /* ── Copy button on code blocks ──────────────────────────────── */
-        #content pre .copy-btn {
+        #content .code-wrap .copy-btn {
             position: absolute;
             top: 6px;
             right: 6px;
@@ -514,21 +526,21 @@
             z-index: 2;
         }
 
-        #content pre:hover .copy-btn {
+        #content .code-wrap:hover .copy-btn {
             opacity: 1;
         }
 
-        #content pre .copy-btn:hover {
+        #content .code-wrap .copy-btn:hover {
             color: var(--fg);
             background: rgba(127, 127, 127, .15);
         }
 
-        #content pre .copy-btn.copied {
+        #content .code-wrap .copy-btn.copied {
             color: #3fb950;
         }
 
-        /* Shift badge down when copy button is present */
-        #content pre[data-lang] .copy-btn {
+        /* Shift the button down when a language badge occupies the corner */
+        #content .code-wrap .code-lang ~ .copy-btn {
             top: 26px;
         }
 
@@ -1126,7 +1138,13 @@
                 html = self.renderToken(tokens, idx, options);
             }
             if (lineAttr) html = html.replace(/^<pre\b/, `<pre${lineAttr}`);
-            return html;
+            // Wrap in a non-scrolling container so the language badge and the
+            // copy button stay pinned while the <pre> scrolls horizontally.
+            // Emitted here rather than in a DOM pass so morphdom's virtual
+            // tree matches the live tree and code blocks patch in place.
+            const langMatch = html.match(/^<pre[^>]*\bdata-lang="([^"]*)"/);
+            const badge = langMatch ? `<span class="code-lang">${langMatch[1]}</span>` : '';
+            return `<div class="code-wrap">${badge}${html}</div>`;
         };
 
         // ── Iconify auto-detection ────────────────────────────────────
@@ -1200,8 +1218,10 @@
 
         // ── Copy button on code blocks ────────────────────────────────
         function attachCopyButtons() {
-            contentEl.querySelectorAll('pre.hljs').forEach(pre => {
-                if (pre.querySelector('.copy-btn')) return;
+            contentEl.querySelectorAll('.code-wrap').forEach(wrap => {
+                if (wrap.querySelector('.copy-btn')) return;
+                const pre = wrap.querySelector('pre');
+                if (!pre) return;
                 const btn = document.createElement('button');
                 btn.className = 'copy-btn';
                 btn.title = 'Copy code';
@@ -1220,7 +1240,7 @@
                         }, 1500);
                     } catch (_) { }
                 });
-                pre.appendChild(btn);
+                wrap.appendChild(btn);
             });
         }
 
