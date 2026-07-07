@@ -513,7 +513,9 @@ function M.start()
 			root = dir,
 			default_index = index_path,
 			headers = { ["Cache-Control"] = "no-cache" },
-			cors = true,
+			-- No cors: the preview page is same-origin and remote.lua talks raw
+			-- TCP. A wildcard ACAO would let any website in the user's browser
+			-- read the token out of the (unauthenticated) index page.
 			live = {
 				enabled = true,
 				inject_script = false,
