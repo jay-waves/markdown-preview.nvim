@@ -125,6 +125,8 @@ require("markdown_preview").setup({
 
   default_theme = "dark",               -- "dark" or "light"; initial preview theme (toggleable in browser)
 
+  yaml_mode = "panel",                  -- front matter: "panel" (collapsible above preview), "hide", or "raw"
+
   scroll_sync = true,                   -- browser follows cursor position
 
   -- Fraction (0–1): vertical position of the final line when scrolled to end.

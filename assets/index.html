@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__">
+<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__">
 
 <head>
     <meta charset="utf-8" />
@@ -532,6 +532,31 @@
             top: 26px;
         }
 
+        /* ── Front matter panel ───────────────────────────────────────── */
+        #fm-panel {
+            margin: 0 0 1.2rem;
+            border: 1px solid var(--stroke);
+            border-radius: 8px;
+            background: var(--panel);
+            font-size: .85rem;
+        }
+
+        #fm-panel summary {
+            padding: .45em .9em;
+            cursor: pointer;
+            color: var(--fg-muted);
+            user-select: none;
+        }
+
+        #fm-panel pre {
+            margin: 0;
+            padding: .6em .9em;
+            border-top: 1px solid var(--stroke);
+            white-space: pre-wrap;
+            color: var(--fg-muted);
+            font-size: .82rem;
+        }
+
         /* ── GitHub callouts / admonitions ────────────────────────────── */
         #content .markdown-alert {
             padding: .5rem 1em;
@@ -809,6 +834,10 @@
         <div class="skeleton-line"></div>
     </div>
 
+    <details id="fm-panel" style="display:none">
+        <summary>Front matter</summary>
+        <pre id="fm-content"></pre>
+    </details>
     <div id="content" style="display:none"></div>
 
     <!-- Fullscreen overlay for diagram zoom/pan -->
@@ -844,7 +873,6 @@
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js"></script>
     <script src="https://unpkg.com/markdown-it-anchor@9.2.0/dist/markdownItAnchor.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it-front-matter@0.2.4/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/texmath.js"></script>
 
@@ -1002,8 +1030,46 @@
             }
         });
 
+        // ── Front matter ──────────────────────────────────────────────
+        // Inline block rule; the CDN build of markdown-it-front-matter is
+        // CJS-only and never registered in a browser. Captured YAML goes to
+        // the #fm-panel <details> (mode "panel") or is dropped ("hide");
+        // mode "raw" skips the rule so the text renders as ordinary markdown.
+        const YAML_MODE = document.documentElement.dataset.yamlMode || 'panel';
+        let capturedFrontMatter = null;
+        if (YAML_MODE !== 'raw') {
+            md.block.ruler.before('table', 'front_matter', function (state, startLine, endLine, silent) {
+                if (startLine !== 0 || state.blkIndent !== 0) return false;
+                if (state.src.slice(state.bMarks[0], state.eMarks[0]) !== '---') return false;
+                let closed = -1;
+                for (let next = startLine + 1; next < endLine; next++) {
+                    if (state.tShift[next] > 0) continue;
+                    const line = state.src.slice(state.bMarks[next], state.eMarks[next]);
+                    if (/^-{3,}\s*$/.test(line)) { closed = next; break; }
+                }
+                // Unlike upstream, bail out when unclosed: while the fence is
+                // still being typed, consuming to EOF would blank the preview.
+                if (closed < 0) return false;
+                if (silent) return true;
+                capturedFrontMatter = state.src.slice(state.bMarks[1], state.bMarks[closed]);
+                state.line = closed + 1;
+                return true;
+            }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
+        }
+
+        function updateFrontMatterPanel() {
+            const panel = $('fm-panel');
+            if (!panel) return;
+            if (YAML_MODE === 'panel' && capturedFrontMatter !== null) {
+                const pre = $('fm-content');
+                if (pre && pre.textContent !== capturedFrontMatter) pre.textContent = capturedFrontMatter;
+                panel.style.display = '';
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
         // Register plugins
-        if (window.markdownItFrontMatter) md.use(window.markdownItFrontMatter, function() {});
         md.use(markdownItGithubAlerts);
         if (window.markdownitEmoji) md.use(window.markdownitEmoji);
         if (window.markdownitFootnote) md.use(window.markdownitFootnote);
@@ -1188,7 +1254,9 @@
             lastContent = text;
 
             try {
+                capturedFrontMatter = null;
                 const html = md.render(text);
+                updateFrontMatterPanel();
 
                 showContent();
 

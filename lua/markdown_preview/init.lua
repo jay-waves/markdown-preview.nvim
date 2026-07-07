@@ -50,6 +50,12 @@ M.config = {
 	-- "dark" or "light"; determines the initial theme of the preview page
 	default_theme = "dark",
 
+	-- YAML front matter (--- ... --- at the top of the file):
+	-- "panel" = strip it from the preview, show in a collapsible panel above
+	-- "hide"  = strip it entirely
+	-- "raw"   = leave it in the document (renders as markdown)
+	yaml_mode = "panel",
+
 	-- Fraction (0–1): vertical position of the final line when scrolled to end.
 	-- 0.5 = middle of viewport (default), 1.0 = bottom edge (no extra space)
 	bottom_padding = 0.5,
@@ -133,6 +139,11 @@ local function write_index(dir)
 		return 'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"'
 	end)
 	content = content:gsub("__THEME__", function() return M.config.default_theme end)
+	content = content:gsub("__YAML_MODE__", function()
+		local m = M.config.yaml_mode
+		if m ~= "hide" and m ~= "raw" then m = "panel" end
+		return m
+	end)
 
 	-- Inline custom CSS after the bundled styles so user rules win the cascade.
 	if M.config.custom_css and M.config.custom_css ~= "" then
