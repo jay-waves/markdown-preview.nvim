@@ -7,7 +7,8 @@ Live **Markdown preview** for Neovim with first-class **Mermaid diagram** suppor
 - Renders your entire `.md` file in the browser — headings, tables, code blocks, everything
 - **Relative images work** — `![](pic.png)` next to your `.md` file renders in the preview
 - **Mermaid diagrams** render inline as interactive SVGs (click to expand, zoom, pan, export)
-- **Instant updates** via Server-Sent Events (no polling) with **scroll sync** — browser follows your cursor
+- **Instant updates** via Server-Sent Events (no polling), with optional **scroll sync**
+- **Click-to-Neovim** — click a rendered Markdown block to scroll its Neovim instance to the source
 - **LaTeX math** — inline `$...$` and display `$$...$$` rendered via KaTeX
 - **Syntax highlighting** for code blocks (highlight.js)
 - Dark / Light theme toggle with colored heading accents
@@ -28,7 +29,7 @@ Live **Markdown preview** for Neovim with first-class **Mermaid diagram** suppor
   config = function()
     require("markdown_preview").setup({
       -- all optional; sane defaults shown
-      instance_mode = "takeover",  -- "takeover" (one tab) or "multi" (tab per instance)
+      instance_mode = "multi",     -- default: one previewer per Neovim instance
       port = 0,                    -- 0 = auto (8421 for takeover, OS-assigned for multi)
       open_browser = true,
       default_theme = "dark",      -- "dark" or "light"; initial preview theme
@@ -97,7 +98,7 @@ The preview opens a polished browser app with:
 
 ```lua
 require("markdown_preview").setup({
-  instance_mode = "takeover",           -- "takeover" or "multi" (see below)
+  instance_mode = "multi",              -- "multi" (default) or "takeover" (see below)
   port = 0,                             -- 0 = auto (8421 for takeover, OS-assigned for multi)
   host = "127.0.0.1",                   -- bind address; "0.0.0.0" for network access (see Remote access)
   open_browser = true,                  -- auto-open browser on start
@@ -130,7 +131,8 @@ require("markdown_preview").setup({
 
   allow_raw_html = true,                -- render raw HTML in markdown; set false for untrusted files (see Security)
 
-  scroll_sync = true,                   -- browser follows cursor position
+  scroll_sync = false,                  -- opt in: browser follows Neovim's cursor
+  click_to_nvim = true,                 -- click a rendered block to scroll Neovim
 
   -- Fraction (0–1): vertical position of the final line when scrolled to end.
   -- 0.5 = middle of viewport (default), 1.0 = bottom edge (no extra space)
@@ -142,6 +144,8 @@ require("markdown_preview").setup({
   },
 })
 ```
+
+`click_to_nvim` applies to the default `multi` mode, where each previewer has exactly one corresponding Neovim instance.
 
 ### Hooks
 
@@ -190,9 +194,9 @@ The notification will show the full URL including the auth token (e.g. `http://1
 
 ### Instance modes
 
-**Takeover** (default) — all Neovim instances share a single workspace and browser tab. The first instance to run `:MarkdownPreview` becomes the primary (starts the server on port 8421). Subsequent instances become secondaries — they write content to the shared workspace, and the server's file watcher pushes a reload to the browser. Scroll sync works across instances via HTTP event injection.
+**Takeover** — all Neovim instances share a single workspace and browser tab. The first instance to run `:MarkdownPreview` becomes the primary (starts the server on port 8421). Subsequent instances become secondaries — they write content to the shared workspace, and the server's file watcher pushes a reload to the browser. Scroll sync works across instances via HTTP event injection.
 
-**Multi** — each instance gets its own server on an OS-assigned port and its own browser tab. Use this for side-by-side previews of different files.
+**Multi** (default) — each Neovim instance gets its own server on an OS-assigned port and its own previewer. Use this for side-by-side previews of different files.
 
 ```lua
 require("markdown_preview").setup({ instance_mode = "multi" })

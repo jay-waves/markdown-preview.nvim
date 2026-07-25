@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__">
+<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__" data-click-to-nvim="__CLICK_TO_NVIM__" data-click-port="__CLICK_PORT__">
 
 <head>
     <meta charset="utf-8" />
@@ -953,6 +953,8 @@
             if (!LIVE_TOKEN) return url;
             return url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + encodeURIComponent(LIVE_TOKEN);
         };
+        const CLICK_TO_NVIM = document.documentElement.dataset.clickToNvim === 'true';
+        const CLICK_PORT = document.documentElement.dataset.clickPort || '';
 
         // Scroll sync state
         let scrollSyncPaused = false;
@@ -1542,14 +1544,26 @@
         // ── Event delegation for expand buttons ───────────────────────
         contentEl.addEventListener('click', (e) => {
             const expandBtn = e.target.closest('[data-expand]');
-            if (!expandBtn) return;
-            const blockId = expandBtn.dataset.expand;
-            const block = document.getElementById(blockId);
+            if (expandBtn) {
+                const blockId = expandBtn.dataset.expand;
+                const block = document.getElementById(blockId);
+                if (!block) return;
+                const wrap = block.querySelector('.mermaid-svg-wrap');
+                if (!wrap) return;
+                const svg = wrap.innerHTML;
+                if (svg) openOverlay(svg);
+                return;
+            }
+
+            if (!CLICK_TO_NVIM || !CLICK_PORT) return;
+            if (e.target.closest('a, button, input, select, textarea, summary')) return;
+            const block = e.target.closest('[data-source-line]');
             if (!block) return;
-            const wrap = block.querySelector('.mermaid-svg-wrap');
-            if (!wrap) return;
-            const svg = wrap.innerHTML;
-            if (svg) openOverlay(svg);
+            const line = Number(block.dataset.sourceLine);
+            if (!Number.isInteger(line) || line < 0) return;
+            const url = `${location.protocol}//${location.hostname}:${CLICK_PORT}` +
+                `/__markdown_preview/click?line=${line}&t=${encodeURIComponent(LIVE_TOKEN)}`;
+            fetch(url, { mode: 'no-cors', cache: 'no-store', keepalive: true }).catch(() => {});
         });
 
         // Re-apply scroll when layout shifts (images loading, etc.)

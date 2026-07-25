@@ -1,6 +1,7 @@
 -- lua/markdown_preview/init.lua
 local ts = require("markdown_preview.ts")
 local util = require("markdown_preview.util")
+local click = require("markdown_preview.click")
 local ls_server = require("live_server.server")
 local ls_util = require("live_server.util")
 
@@ -18,7 +19,7 @@ M.config = {
 
 	-- "takeover" = shared workspace + fixed port, one browser tab across instances
 	-- "multi" = per-instance server + browser tab (port 0 recommended)
-	instance_mode = "takeover",
+	instance_mode = "multi",
 
 	content_name = "content.md",
 	index_name = "index.html",
@@ -45,7 +46,8 @@ M.config = {
 	-- Enables %%{init: {"layout": "elk"}}%% in diagrams.
 	mermaid_elk = false,
 
-	scroll_sync = true, -- sync browser scroll to cursor position
+	scroll_sync = false, -- sync browser scroll to cursor position
+	click_to_nvim = true, -- click a rendered block to scroll Neovim to its source
 
 	-- "dark" or "light"; determines the initial theme of the preview page
 	default_theme = "dark",
@@ -90,6 +92,7 @@ M._last_scroll_line = nil
 M._is_primary = nil      -- true/false/nil (takeover mode)
 M._takeover_port = nil   -- port of primary server (secondary uses for HTTP events)
 M._token = nil           -- live-server auth token (primary owns; secondaries read from lockfile)
+M._click_server = nil
 
 local function effective_port()
 	if M.config.port ~= 0 then return M.config.port end
@@ -146,6 +149,12 @@ local function write_index(dir)
 	content = content:gsub("__ALLOW_HTML__", function()
 		return M.config.allow_raw_html ~= false and "true" or "false"
 	end)
+	content = content:gsub("__CLICK_TO_NVIM__", function()
+		return M.config.instance_mode == "multi" and M.config.click_to_nvim and M._click_server and "true" or "false"
+	end)
+	content = content:gsub("__CLICK_PORT__", function()
+		return M._click_server and tostring(M._click_server.port) or ""
+	end)
 	content = content:gsub("__YAML_MODE__", function()
 		local m = M.config.yaml_mode
 		if m ~= "hide" and m ~= "raw" then m = "panel" end
@@ -182,8 +191,9 @@ local function write_index_if_needed(dir)
 	-- network switch (which flips whether the token is baked at all) — a stale
 	-- non-empty token on a network bind would otherwise 401 every request.
 	local want = 'data-live-token="' .. (host_is_loopback() and (M._token or "") or "") .. '"'
+	local want_click = 'data-click-port="' .. (M._click_server and tostring(M._click_server.port) or "") .. '"'
 	local ok, existing = pcall(util.read_text, dst)
-	if not ok or not existing:find(want, 1, true) then
+	if not ok or not existing:find(want, 1, true) or not existing:find(want_click, 1, true) then
 		return write_index(dir)
 	end
 	return dst
@@ -479,13 +489,15 @@ local function set_autocmds_for_buffer(bufnr)
 		end
 	end
 
-	for _, ev in ipairs({ "CursorMoved", "CursorMovedI" }) do
-		vim.api.nvim_create_autocmd(ev, {
-			group = M._augroup,
-			buffer = bufnr,
-			callback = function() send_scroll_sync(bufnr) end,
-			desc = "Markdown Preview scroll sync",
-		})
+	if M.config.scroll_sync then
+		for _, ev in ipairs({ "CursorMoved", "CursorMovedI" }) do
+			vim.api.nvim_create_autocmd(ev, {
+				group = M._augroup,
+				buffer = bufnr,
+				callback = function() send_scroll_sync(bufnr) end,
+				desc = "Markdown Preview scroll sync",
+			})
+		end
 	end
 end
 
@@ -514,6 +526,35 @@ local function browser_url(port)
 		return base .. "?t=" .. M._token
 	end
 	return base
+end
+
+local function scroll_nvim_to_line(line)
+	local bufnr = M._active_bufnr
+	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
+	local wins = vim.fn.win_findbuf(bufnr)
+	if #wins == 0 then return end
+
+	local winid = wins[1]
+	if vim.api.nvim_get_current_buf() == bufnr then
+		winid = vim.api.nvim_get_current_win()
+	end
+	local last_line = vim.api.nvim_buf_line_count(bufnr)
+	local target = math.max(1, math.min(last_line, line + 1))
+	pcall(vim.api.nvim_win_set_cursor, winid, { target, 0 })
+	pcall(vim.api.nvim_win_call, winid, function()
+		vim.cmd("normal! zz")
+	end)
+end
+
+local function ensure_click_server()
+	if not M.config.click_to_nvim or M.config.instance_mode ~= "multi" then return end
+	if M._click_server then return end
+	local ok, instance = pcall(click.start, M.config.host, M._token, scroll_nvim_to_line)
+	if ok then
+		M._click_server = instance
+	else
+		vim.notify("Markdown Preview: click_to_nvim unavailable — " .. tostring(instance), vim.log.levels.WARN)
+	end
 end
 
 function M.start()
@@ -578,6 +619,7 @@ function M.start()
 		M._token = ls_util.random_token(16)
 	end
 
+	ensure_click_server()
 	write_index_if_needed(dir)
 	write_content(dir, text, bufnr)
 	M._last_text_by_buf[bufnr] = text
@@ -706,6 +748,8 @@ function M.stop()
 		pcall(ls_server.stop, M._server_instance)
 		M._server_instance = nil
 	end
+	click.stop(M._click_server)
+	M._click_server = nil
 	if M._is_primary then
 		require("markdown_preview.lock").remove()
 	end

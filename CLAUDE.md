@@ -31,14 +31,14 @@ Key live-server APIs used:
 
 ### Instance Modes
 
-- **takeover** (default): shared workspace + fixed port (8421). One browser tab across all Neovim instances. First instance is primary (runs server), others are secondary (write files only, server's fs_watch triggers reload).
-- **multi**: per-instance server with OS-assigned port (port 0). Each instance gets its own browser tab.
+- **takeover**: shared workspace + fixed port (8421). One browser tab across all Neovim instances. First instance is primary (runs server), others are secondary (write files only, server's fs_watch triggers reload).
+- **multi** (default): per-instance server with OS-assigned port (port 0). Each instance gets its own browser tab.
 
 ## How to Test
 
 1. Open a `.md` file in Neovim, run `:MarkdownPreview`
 2. For takeover mode: open another `.md` in a separate Neovim instance, run `:MarkdownPreview` — same browser tab should update
-3. For multi mode: set `instance_mode = "multi"` in setup, each instance opens a new tab
+3. Multi mode is the default: each instance opens its own tab
 4. Test scroll sync by moving cursor — browser should follow
 5. Test `:MarkdownPreviewStop` — server stops, lock file cleaned up (takeover primary)
 
