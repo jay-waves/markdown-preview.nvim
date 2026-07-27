@@ -38,6 +38,10 @@ M.config = {
 	debounce_ms = 300,
 	notify_on_refresh = false,
 
+	-- After the first :MarkdownPreview, reuse the same server and browser tab
+	-- when entering another Markdown buffer. Non-Markdown buffers are ignored.
+	follow_current_buffer = false,
+
 	-- "js" = browser-side mermaid.js (default, zero deps)
 	-- "rust" = pre-render via mermaid-rs-renderer (mmdr) CLI (~400x faster)
 	mermaid_renderer = "js",
@@ -513,6 +517,29 @@ local function set_autocmds_for_buffer(bufnr)
 			})
 		end
 	end
+
+	if M.config.follow_current_buffer then
+		vim.api.nvim_create_autocmd("BufEnter", {
+			group = M._augroup,
+			callback = function(args)
+				if not M._token
+					or args.buf == M._active_bufnr
+					or vim.bo[args.buf].filetype ~= "markdown"
+				then
+					return
+				end
+
+				-- Retarget after BufEnter finishes. start() recreates this
+				-- augroup for the new active buffer.
+				vim.schedule(function()
+					if M._token and vim.api.nvim_get_current_buf() == args.buf then
+						M.start()
+					end
+				end)
+			end,
+			desc = "Markdown Preview: follow current Markdown buffer",
+		})
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -768,6 +795,7 @@ function M.stop()
 		require("markdown_preview.lock").remove()
 	end
 	M._workspace_dir = nil
+	M._active_bufnr = nil
 	M._last_scroll_line = nil
 	M._is_primary = nil
 	M._takeover_port = nil

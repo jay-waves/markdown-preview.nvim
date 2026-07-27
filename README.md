@@ -127,6 +127,10 @@ require("markdown_preview").setup({
   debounce_ms = 300,                    -- debounce interval
   notify_on_refresh = false,            -- show notification on refresh
 
+  -- After the first :MarkdownPreview, reuse its server/browser tab when
+  -- entering another Markdown buffer. Other filetypes leave it unchanged.
+  follow_current_buffer = false,
+
   mermaid_renderer = "js",              -- "js" (browser mermaid.js) or "rust" (mmdr CLI, ~400x faster)
 
   default_theme = "auto",               -- follow the OS; "dark" or "light" forces a theme
@@ -200,7 +204,7 @@ The notification will show the full URL including the auth token (e.g. `http://1
 
 **Takeover** — all Neovim instances share a single workspace and browser tab. The first instance to run `:MarkdownPreview` becomes the primary (starts the server on port 8421). Subsequent instances become secondaries — they write content to the shared workspace, and the server's file watcher pushes a reload to the browser. Scroll sync works across instances via HTTP event injection.
 
-**Multi** (default) — each Neovim instance gets its own server on an OS-assigned port and its own previewer. Use this for side-by-side previews of different files.
+**Multi** (default) — each Neovim instance gets its own server on an OS-assigned port and its own previewer. With `follow_current_buffer = true`, that server and browser tab retarget when you enter another Markdown buffer.
 
 ```lua
 require("markdown_preview").setup({ instance_mode = "multi" })
@@ -254,7 +258,7 @@ Rendered preview (scroll preserved, no flicker)
 - **SSE** (Server-Sent Events) from `live-server.nvim` push updates instantly — no polling
 - **morphdom** diffs the DOM efficiently, preserving scroll position and interactive state
 - **Takeover mode** shares a single workspace (`~/.cache/nvim/markdown-preview/shared/`) and browser tab across all Neovim instances via a lock file
-- **Multi mode** uses per-buffer workspaces under `~/.cache/nvim/markdown-preview/<hash>/` with independent servers
+- **Multi mode** uses per-buffer workspaces under `~/.cache/nvim/markdown-preview/<hash>/`; one server per Neovim instance retargets between them
 
 ---
 

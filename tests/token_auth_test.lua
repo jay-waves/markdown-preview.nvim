@@ -20,12 +20,16 @@ do
 end
 local theme_css = vim.fs.joinpath(tmpdir, "theme.css")
 local highlight_css = vim.fs.joinpath(tmpdir, "highlight.css")
+local second_mdfile = vim.fs.joinpath(tmpdir, "second.md")
 do
 	local fd = uv.fs_open(theme_css, "w", 420)
 	uv.fs_write(fd, "/* custom-theme-marker */\n", 0)
 	uv.fs_close(fd)
 	fd = uv.fs_open(highlight_css, "w", 420)
 	uv.fs_write(fd, "/* custom-highlight-marker */\n", 0)
+	uv.fs_close(fd)
+	fd = uv.fs_open(second_mdfile, "w", 420)
+	uv.fs_write(fd, "# second buffer\n\nfollow marker.\n", 0)
 	uv.fs_close(fd)
 end
 
@@ -38,6 +42,7 @@ mp.setup({
 	open_browser = false,
 	instance_mode = "multi",
 	custom_css = { theme_css, highlight_css },
+	follow_current_buffer = true,
 })
 
 -- ─── Start ──────────────────────────────────────────────────────────────────
@@ -89,10 +94,24 @@ r = http_get(("http://127.0.0.1:%d/content.md?t=%s"):format(port, mp._token))
 ok(r.status == 200, "/content.md with correct token is 200")
 ok(r.body:find("hello") ~= nil, "/content.md body contains buffer text")
 
+-- Entering another Markdown buffer reuses the same server and retargets it.
+vim.cmd("edit " .. second_mdfile)
+vim.bo.filetype = "markdown"
+vim.api.nvim_exec_autocmds("BufEnter", { buffer = vim.api.nvim_get_current_buf() })
+vim.wait(1000, function()
+	return mp._active_bufnr == vim.api.nvim_get_current_buf()
+end)
+ok(mp._server_instance ~= nil and mp._server_instance.port == port,
+	"follow_current_buffer reuses the existing server")
+r = http_get(("http://127.0.0.1:%d/content.md?t=%s"):format(port, mp._token))
+ok(r.status == 200 and r.body:find("follow marker", 1, true) ~= nil,
+	"follow_current_buffer retargets content to the entered Markdown buffer")
+
 -- ─── Stop and verify cleanup ────────────────────────────────────────────────
 mp.stop()
 ok(mp._token == nil, "_token cleared after stop")
 ok(mp._server_instance == nil, "_server_instance cleared after stop")
+ok(mp._active_bufnr == nil, "_active_bufnr cleared after stop")
 
 -- Port no longer accepts connections (give it a moment)
 vim.wait(200, function() return false end)
