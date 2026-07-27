@@ -63,6 +63,8 @@ local r = http_get(("http://127.0.0.1:%d/"):format(port))
 ok(r.status == 200, "/ (index) is 200 without token")
 ok(r.body:find("data%-live%-token=\"" .. mp._token .. "\"") ~= nil,
 	"index.html has data-live-token attribute set to current token")
+ok(r.body:find('data%-theme%-mode="auto"') ~= nil,
+	"default preview theme follows the system color scheme")
 
 -- content.md is gated
 r = http_get(("http://127.0.0.1:%d/content.md"):format(port))

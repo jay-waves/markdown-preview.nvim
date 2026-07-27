@@ -1,10 +1,19 @@
 <!doctype html>
-<html lang="en" data-theme="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__" data-click-to-nvim="__CLICK_TO_NVIM__" data-click-port="__CLICK_PORT__">
+<html lang="en" data-theme="__THEME__" data-theme-mode="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__" data-click-to-nvim="__CLICK_TO_NVIM__" data-click-port="__CLICK_PORT__">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Markdown Preview</title>
+
+    <script>
+        // Resolve the system theme before styles are parsed to avoid a flash of
+        // the wrong color scheme. data-theme-mode retains the configured mode.
+        if (document.documentElement.dataset.themeMode === 'auto') {
+            document.documentElement.dataset.theme =
+                window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+    </script>
 
     <!-- highlight.js theme (swapped dynamically for light mode) -->
     <link id="hljs-theme" rel="stylesheet"
@@ -17,6 +26,7 @@
     <style>
         /* ── CSS Variables ─────────────────────────────────────────────── */
         :root {
+            color-scheme: dark;
             --bg: #0d1117;
             --panel: #161b22;
             --stroke: #30363d;
@@ -54,6 +64,7 @@
         }
 
         [data-theme="light"] {
+            color-scheme: light;
             --bg: #ffffff;
             --panel: #f6f8fa;
             --stroke: #d0d7de;
@@ -924,6 +935,8 @@
 
         // ── State ─────────────────────────────────────────────────────
         let lastContent = null;
+        const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        let followsSystemTheme = document.documentElement.dataset.themeMode === 'auto';
         let currentTheme = document.documentElement.dataset.theme || 'dark';
         let mermaidIdCounter = 0;
         let sseConnected = false;
@@ -1013,7 +1026,14 @@
         }
 
         themeBtn.addEventListener('click', () => {
+            followsSystemTheme = false;
             applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+            renderAllMermaidBlocks();
+        });
+
+        systemThemeQuery.addEventListener('change', (event) => {
+            if (!followsSystemTheme) return;
+            applyTheme(event.matches ? 'dark' : 'light');
             renderAllMermaidBlocks();
         });
 

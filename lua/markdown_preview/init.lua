@@ -49,8 +49,8 @@ M.config = {
 	scroll_sync = false, -- sync browser scroll to cursor position
 	click_to_nvim = true, -- click a rendered block to scroll Neovim to its source
 
-	-- "dark" or "light"; determines the initial theme of the preview page
-	default_theme = "dark",
+	-- "auto" follows the OS color scheme; "dark" or "light" forces a theme
+	default_theme = "auto",
 
 	-- Render raw HTML embedded in markdown (GitHub-like). Set false when
 	-- previewing untrusted markdown: raw HTML runs inside the preview page.
