@@ -18,6 +18,16 @@ do
 	uv.fs_write(fd, "# hello\n\nbody text here.\n", 0)
 	uv.fs_close(fd)
 end
+local theme_css = vim.fs.joinpath(tmpdir, "theme.css")
+local highlight_css = vim.fs.joinpath(tmpdir, "highlight.css")
+do
+	local fd = uv.fs_open(theme_css, "w", 420)
+	uv.fs_write(fd, "/* custom-theme-marker */\n", 0)
+	uv.fs_close(fd)
+	fd = uv.fs_open(highlight_css, "w", 420)
+	uv.fs_write(fd, "/* custom-highlight-marker */\n", 0)
+	uv.fs_close(fd)
+end
 
 vim.cmd("edit " .. mdfile)
 vim.bo.filetype = "markdown"
@@ -27,6 +37,7 @@ local mp = require("markdown_preview")
 mp.setup({
 	open_browser = false,
 	instance_mode = "multi",
+	custom_css = { theme_css, highlight_css },
 })
 
 -- ─── Start ──────────────────────────────────────────────────────────────────
@@ -65,6 +76,10 @@ ok(r.body:find("data%-live%-token=\"" .. mp._token .. "\"") ~= nil,
 	"index.html has data-live-token attribute set to current token")
 ok(r.body:find('data%-theme%-mode="auto"') ~= nil,
 	"default preview theme follows the system color scheme")
+local theme_pos = r.body:find("custom%-theme%-marker")
+local highlight_pos = r.body:find("custom%-highlight%-marker")
+ok(theme_pos ~= nil and highlight_pos ~= nil and theme_pos < highlight_pos,
+	"custom_css files are injected in configured order")
 
 -- content.md is gated
 r = http_get(("http://127.0.0.1:%d/content.md"):format(port))

@@ -111,7 +111,11 @@ require("markdown_preview").setup({
 
   content_name = "content.md",          -- workspace content file
   index_name = "index.html",            -- workspace HTML file
-  custom_css = "",                      -- CSS file layered over bundled styles (~ and $VARS ok; "" = off)
+  -- One CSS path, or an ordered list. Later files win the cascade.
+  custom_css = {
+    vim.fs.joinpath(vim.fn.stdpath("config"), "css", "theme.css"),
+    vim.fs.joinpath(vim.fn.stdpath("config"), "css", "highlight.css"),
+  },
   workspace_dir = nil,                  -- nil = auto (shared for takeover, per-buffer for multi)
 
   overwrite_index_on_start = true,      -- copy plugin's index.html on every start

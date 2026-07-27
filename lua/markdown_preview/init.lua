@@ -24,8 +24,8 @@ M.config = {
 	content_name = "content.md",
 	index_name = "index.html",
 
-	-- Path to a CSS file injected after the bundled styles, so user rules win
-	-- the cascade without !important. Supports ~ and $VARS. "" = disabled.
+	-- Path or ordered list of paths to CSS files injected after the bundled
+	-- styles. Supports ~ and $VARS. "" or {} = disabled.
 	custom_css = "",
 
 	-- nil = per-buffer workspace (recommended); set a path to override
@@ -162,16 +162,30 @@ local function write_index(dir)
 	end)
 
 	-- Inline custom CSS after the bundled styles so user rules win the cascade.
-	if M.config.custom_css and M.config.custom_css ~= "" then
-		local css_src = vim.fn.expand(M.config.custom_css)
-		local ok, css = pcall(util.read_text, css_src)
-		if ok and css then
-			content = content:gsub("</head>", function()
-				return "<style>\n" .. css .. "\n</style>\n</head>"
-			end, 1)
-		else
-			vim.notify("Markdown Preview: custom_css not readable: " .. css_src, vim.log.levels.WARN)
+	-- A list keeps base theme and syntax highlighting files independent while
+	-- preserving their configured cascade order.
+	local custom_css = M.config.custom_css
+	local css_sources = type(custom_css) == "table" and custom_css or { custom_css }
+	local css_blocks = {}
+	for index, css_path in ipairs(css_sources) do
+		if type(css_path) == "string" and css_path ~= "" then
+			local css_src = vim.fn.expand(css_path)
+			local ok, css = pcall(util.read_text, css_src)
+			if ok and css then
+				css_blocks[#css_blocks + 1] = "<style>\n" .. css .. "\n</style>"
+			else
+				vim.notify("Markdown Preview: custom_css[" .. index .. "] not readable: " .. css_src,
+					vim.log.levels.WARN)
+			end
+		elseif css_path ~= nil then
+			vim.notify("Markdown Preview: custom_css[" .. index .. "] must be a file path",
+				vim.log.levels.WARN)
 		end
+	end
+	if #css_blocks > 0 then
+		content = content:gsub("</head>", function()
+			return table.concat(css_blocks, "\n") .. "\n</head>"
+		end, 1)
 	end
 
 	util.write_text(dst, content)
