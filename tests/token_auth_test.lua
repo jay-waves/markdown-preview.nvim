@@ -96,8 +96,8 @@ ok(r.body:find("yaml@2%.9%.0/%+esm") ~= nil
 	"structured front matter uses the pinned browser-side YAML parser")
 ok(r.body:find('class="fm%-title"') ~= nil
 		and r.body:find("renderFrontMatterGrid", 1, true) ~= nil
-		and r.body:find("View YAML source", 1, true) ~= nil,
-	"front matter metadata card and source fallback are present")
+		and r.body:find("View YAML source", 1, true) == nil,
+	"front matter metadata card is present without a raw source view")
 local theme_pos = r.body:find("custom%-theme%-marker")
 local highlight_pos = r.body:find("custom%-highlight%-marker")
 ok(theme_pos ~= nil and highlight_pos ~= nil and theme_pos < highlight_pos,
