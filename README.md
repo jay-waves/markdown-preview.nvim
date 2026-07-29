@@ -11,7 +11,7 @@ Live **Markdown preview** for Neovim with first-class **Mermaid diagram** suppor
 - **Click-to-Neovim** — click a rendered Markdown block to scroll its Neovim instance to the source
 - **LaTeX math** — inline `$...$` and display `$$...$$` rendered via KaTeX
 - **Syntax highlighting** for code blocks (highlight.js)
-- Dark / Light theme toggle with colored heading accents
+- Automatic Dark / Light theme following the system color scheme
 - **Optional Rust-powered rendering** — use [`mermaid-rs-renderer`](https://github.com/1jehuang/mermaid-rs-renderer) for ~400x faster mermaid diagrams
 - **Zero external dependencies** — no npm, no Node.js, just Neovim + your browser
 - Powered by [`live-server.nvim`](https://github.com/selimacerbas/live-server.nvim) (pure Lua HTTP server)
@@ -85,8 +85,7 @@ The preview opens a polished browser app with:
 - **Interactive Mermaid diagrams** — rendered inline as SVGs:
   - Hover a diagram to reveal the **expand button**
   - Click to open a **fullscreen overlay** with zoom, pan, fit-to-width/height, and SVG export
-- **Dark / Light theme** toggle (sun/moon icon in header)
-- **Live connection indicator** — green dot when SSE is connected
+- **Dark / Light theme** follows the system color scheme automatically
 - **Per-diagram error handling** — if one mermaid block is invalid, only that block shows an error; the rest of the page renders fine
 - **LaTeX math rendering** — `$E = mc^2$` inline and `$$\int_0^\infty$$` display math via KaTeX, plus `\begin{equation}` environments
 - **Scroll sync** — browser follows your cursor position with line-level precision

@@ -81,6 +81,16 @@ ok(r.body:find("data%-live%-token=\"" .. mp._token .. "\"") ~= nil,
 	"index.html has data-live-token attribute set to current token")
 ok(r.body:find('data%-theme%-mode="auto"') ~= nil,
 	"default preview theme follows the system color scheme")
+ok(r.body:find('id="markdown%-theme"') ~= nil
+		and r.body:find("__MARKDOWN_THEME_CSS__", 1, true) == nil,
+	"bundled Markdown theme is inlined")
+ok(r.body:find('id="highlight%-theme"') ~= nil
+		and r.body:find("__HIGHLIGHT_THEME_CSS__", 1, true) == nil,
+	"bundled highlight theme is inlined")
+ok(r.body:find("<header", 1, true) == nil and r.body:find('id="themeBtn"', 1, true) == nil,
+	"preview has no redundant theme toolbar")
+ok(r.body:find('id="hljs%-theme"') == nil,
+	"preview does not load a competing highlight stylesheet")
 local theme_pos = r.body:find("custom%-theme%-marker")
 local highlight_pos = r.body:find("custom%-highlight%-marker")
 ok(theme_pos ~= nil and highlight_pos ~= nil and theme_pos < highlight_pos,

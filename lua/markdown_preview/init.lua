@@ -137,6 +137,20 @@ local function write_index(dir)
 	end
 	local content = util.read_text(src)
 
+	-- Inline the shipped Markdown and syntax themes. Keeping them as separate
+	-- assets makes the preview shell independent from replaceable typography.
+	for placeholder, asset in pairs({
+		__MARKDOWN_THEME_CSS__ = "assets/theme.css",
+		__HIGHLIGHT_THEME_CSS__ = "assets/highlight.css",
+	}) do
+		local css_path = util.resolve_asset(asset)
+		if not css_path then
+			error("Could not locate " .. asset .. " in runtimepath")
+		end
+		local css = util.read_text(css_path)
+		content = content:gsub(placeholder, function() return css end)
+	end
+
 	-- gsub with function replacement: avoids the "%n is a capture reference"
 	-- escape problem if any substituted value contains '%'.
 	content = content:gsub("__BOTTOM_PADDING__", function() return tostring(M.config.bottom_padding) end)
@@ -172,14 +186,16 @@ local function write_index(dir)
 	local css_sources = type(custom_css) == "table" and custom_css or { custom_css }
 	local css_blocks = {}
 	for index, css_path in ipairs(css_sources) do
-		if type(css_path) == "string" and css_path ~= "" then
-			local css_src = vim.fn.expand(css_path)
-			local ok, css = pcall(util.read_text, css_src)
-			if ok and css then
-				css_blocks[#css_blocks + 1] = "<style>\n" .. css .. "\n</style>"
-			else
-				vim.notify("Markdown Preview: custom_css[" .. index .. "] not readable: " .. css_src,
-					vim.log.levels.WARN)
+		if type(css_path) == "string" then
+			if css_path ~= "" then
+				local css_src = vim.fn.expand(css_path)
+				local ok, css = pcall(util.read_text, css_src)
+				if ok and css then
+					css_blocks[#css_blocks + 1] = "<style>\n" .. css .. "\n</style>"
+				else
+					vim.notify("Markdown Preview: custom_css[" .. index .. "] not readable: " .. css_src,
+						vim.log.levels.WARN)
+				end
 			end
 		elseif css_path ~= nil then
 			vim.notify("Markdown Preview: custom_css[" .. index .. "] must be a file path",

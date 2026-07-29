@@ -15,10 +15,6 @@
         }
     </script>
 
-    <!-- highlight.js theme (swapped dynamically for light mode) -->
-    <link id="hljs-theme" rel="stylesheet"
-        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" />
-
     <!-- KaTeX (LaTeX math rendering) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/css/texmath.css">
@@ -124,65 +120,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ── Header ────────────────────────────────────────────────────── */
-        header {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            gap: .6rem;
-            padding: .55rem 1.2rem;
-            background: var(--panel);
-            border-bottom: 1px solid var(--stroke);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: .9rem;
-            font-weight: 600;
-            letter-spacing: .2px;
-        }
-
-        .header-icon {
-            display: flex;
-            align-items: center;
-            color: var(--fg-muted);
-        }
-
-        .spacer {
-            flex: 1
-        }
-
-        /* Connection dot */
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--fg-muted);
-            opacity: .4;
-            transition: all .3s;
-            flex-shrink: 0;
-        }
-
-        .status-dot.connected {
-            background: #3fb950;
-            opacity: 1;
-            box-shadow: 0 0 6px rgba(63, 185, 80, .5);
-        }
-
-        .status-dot.error {
-            background: #f85149;
-            opacity: 1;
-        }
-
-        #status {
-            font-size: .75rem;
-            color: var(--fg-muted);
-        }
-
         .btn {
             background: transparent;
             border: 1px solid var(--stroke);
@@ -285,206 +222,6 @@
             }
         }
 
-        /* ── Markdown content ──────────────────────────────────────────── */
-        #content {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 2rem 2rem 4rem;
-            animation: fadeIn .2s ease;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(4px)
-            }
-
-            to {
-                opacity: 1;
-                transform: none
-            }
-        }
-
-        #content>*:first-child {
-            margin-top: 0
-        }
-
-        /* Headings */
-        #content h1,
-        #content h2,
-        #content h3,
-        #content h4,
-        #content h5,
-        #content h6 {
-            position: relative;
-            scroll-margin-top: 3.2rem;
-        }
-
-        #content h1 {
-            font-size: 2em;
-            border-bottom: 1px solid var(--stroke);
-            border-left: 3px solid var(--color-h1);
-            padding-bottom: .3em;
-            padding-left: .6em;
-            margin: 1.5em 0 .5em;
-        }
-
-        #content h2 {
-            font-size: 1.5em;
-            border-bottom: 1px solid var(--stroke);
-            border-left: 3px solid var(--color-h2);
-            padding-bottom: .25em;
-            padding-left: .6em;
-            margin: 1.4em 0 .5em;
-        }
-
-        #content h3 {
-            font-size: 1.25em;
-            border-left: 3px solid var(--color-h3);
-            padding-left: .6em;
-            margin: 1.3em 0 .4em;
-        }
-
-        #content h4 {
-            font-size: 1em;
-            border-left: 3px solid var(--color-h4);
-            padding-left: .6em;
-            margin: 1.2em 0 .4em;
-        }
-
-        #content h5 {
-            font-size: .875em;
-            color: var(--fg-muted);
-            border-left: 3px solid var(--color-h5);
-            padding-left: .6em;
-            margin: 1em 0 .4em;
-        }
-
-        #content h6 {
-            font-size: .875em;
-            color: var(--fg-muted);
-            border-left: 3px solid var(--color-h6);
-            padding-left: .6em;
-            margin: 1em 0 .4em;
-        }
-
-
-        /* Paragraphs & text */
-        #content p {
-            margin: 0 0 1em;
-        }
-
-        #content a {
-            color: var(--link);
-            text-decoration: none;
-        }
-
-        #content a:hover {
-            text-decoration: underline;
-        }
-
-        #content strong {
-            font-weight: 600
-        }
-
-        #content img {
-            max-width: 100%;
-            border-radius: 6px;
-        }
-
-        #content hr {
-            height: 3px;
-            background: var(--stroke);
-            border: none;
-            margin: 1.5em 0;
-        }
-
-        /* Lists */
-        #content ul,
-        #content ol {
-            padding-left: 2em;
-            margin: 0 0 1em;
-        }
-
-        #content li+li {
-            margin-top: .25em
-        }
-
-        /* Task lists */
-        #content .task-list-item {
-            list-style: none;
-            margin-left: -1.5em;
-        }
-
-        #content .task-list-item input[type="checkbox"] {
-            margin-right: .4em;
-        }
-
-        /* Blockquotes */
-        #content blockquote {
-            margin: 0 0 1em;
-            padding: .5em 1em;
-            border-left: 4px solid var(--blockquote-border);
-            color: var(--fg-muted);
-        }
-
-        #content blockquote>*:last-child {
-            margin-bottom: 0
-        }
-
-        /* Tables */
-        #content table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0 0 1em;
-            font-size: .9em;
-        }
-
-        #content th,
-        #content td {
-            padding: .5em .8em;
-            border: 1px solid var(--table-border);
-        }
-
-        #content th {
-            background: var(--panel);
-            font-weight: 600;
-        }
-
-        #content tr:nth-child(even) {
-            background: var(--table-row-alt);
-        }
-
-        /* Inline code */
-        #content code {
-            background: var(--code-bg);
-            padding: .15em .35em;
-            border-radius: 4px;
-            font-size: .88em;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-        }
-
-        /* Code blocks */
-        #content pre {
-            position: relative;
-            background: var(--code-bg);
-            border: 1px solid var(--stroke);
-            border-radius: 8px;
-            padding: 1em;
-            overflow-x: auto;
-            margin: 0 0 1em;
-            scrollbar-width: thin;
-            scrollbar-color: var(--scroll-thumb) transparent;
-        }
-
-        #content pre code {
-            background: none;
-            padding: 0;
-            border-radius: 0;
-            font-size: .85em;
-            line-height: 1.55;
-        }
-
         /* Non-scrolling wrapper around fenced code: keeps the language badge
            and copy button pinned while the <pre> scrolls horizontally */
         #content .code-wrap {
@@ -578,105 +315,6 @@
             white-space: pre-wrap;
             color: var(--fg-muted);
             font-size: .82rem;
-        }
-
-        /* ── GitHub callouts / admonitions ────────────────────────────── */
-        #content .markdown-alert {
-            padding: .5rem 1em;
-            margin-bottom: 16px;
-            color: inherit;
-            border-left: .25em solid #888;
-            border-radius: 0 6px 6px 0;
-            background: var(--badge-bg);
-        }
-
-        #content .markdown-alert>:first-child {
-            margin-top: 0;
-        }
-
-        #content .markdown-alert>:last-child {
-            margin-bottom: 0;
-        }
-
-        #content .markdown-alert .markdown-alert-title {
-            display: flex;
-            font-weight: 500;
-            align-items: center;
-            line-height: 1;
-            margin-bottom: .5em;
-        }
-
-        #content .markdown-alert .markdown-alert-title .octicon {
-            margin-right: .5rem;
-            display: inline-block;
-            overflow: visible !important;
-            vertical-align: text-bottom;
-            fill: currentColor;
-        }
-
-        #content .markdown-alert.markdown-alert-note {
-            border-left-color: var(--color-note);
-        }
-
-        #content .markdown-alert.markdown-alert-note .markdown-alert-title {
-            color: var(--color-note);
-        }
-
-        #content .markdown-alert.markdown-alert-tip {
-            border-left-color: var(--color-tip);
-        }
-
-        #content .markdown-alert.markdown-alert-tip .markdown-alert-title {
-            color: var(--color-tip);
-        }
-
-        #content .markdown-alert.markdown-alert-warning {
-            border-left-color: var(--color-warning);
-        }
-
-        #content .markdown-alert.markdown-alert-warning .markdown-alert-title {
-            color: var(--color-warning);
-        }
-
-        #content .markdown-alert.markdown-alert-important {
-            border-left-color: var(--color-important);
-        }
-
-        #content .markdown-alert.markdown-alert-important .markdown-alert-title {
-            color: var(--color-important);
-        }
-
-        #content .markdown-alert.markdown-alert-caution {
-            border-left-color: var(--color-caution);
-        }
-
-        #content .markdown-alert.markdown-alert-caution .markdown-alert-title {
-            color: var(--color-caution);
-        }
-
-        /* ── Footnotes ───────────────────────────────────────────────── */
-        #content .footnotes-sep {
-            margin-top: 2em;
-        }
-
-        #content .footnotes {
-            font-size: .88em;
-            color: var(--fg-muted);
-        }
-
-        #content .footnotes ol {
-            padding-left: 1.5em;
-        }
-
-        #content .footnote-ref a {
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        #content .footnote-backref {
-            text-decoration: none;
-            font-size: .8em;
-            margin-left: .3em;
         }
 
         /* ── Mermaid diagrams ──────────────────────────────────────────── */
@@ -820,30 +458,11 @@
             }
         }
     </style>
+    <style id="markdown-theme">__MARKDOWN_THEME_CSS__</style>
+    <style id="highlight-theme">__HIGHLIGHT_THEME_CSS__</style>
 </head>
 
 <body>
-    <header>
-        <span class="header-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5" />
-                <path d="M7 15V9l2.5 3L12 9v6M16 12l2-3 2 3M16 12h4" stroke="currentColor" stroke-width="1.5"
-                    stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-        </span>
-        <h1>Markdown Preview</h1>
-        <div class="spacer"></div>
-        <div id="statusDot" class="status-dot" title="Disconnected"></div>
-        <span id="status" aria-live="polite"></span>
-        <button id="themeBtn" class="btn" title="Toggle light/dark">
-            <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path id="moonPath"
-                    d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
-                    stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-        </button>
-    </header>
-
     <!-- Loading skeleton (replaced by content) -->
     <div id="loadingSkeleton" class="skeleton">
         <div class="skeleton-line"></div>
@@ -908,9 +527,6 @@
         // ── DOM refs ──────────────────────────────────────────────────
         const $ = (id) => document.getElementById(id);
         const contentEl = $('content');
-        const statusEl = $('status');
-        const themeBtn = $('themeBtn');
-        const statusDot = $('statusDot');
         const loadingSkeleton = $('loadingSkeleton');
 
         // Overlay refs
@@ -925,10 +541,6 @@
         const ovExport = $('ovExport');
         const ovClose = $('ovClose');
 
-        // SVG paths for theme icons
-        const MOON_SVG = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
-        const SUN_SVG = '<circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
-
         // SVG icons for copy button
         const COPY_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="2"/></svg>';
         const CHECK_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -936,7 +548,7 @@
         // ── State ─────────────────────────────────────────────────────
         let lastContent = null;
         const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        let followsSystemTheme = document.documentElement.dataset.themeMode === 'auto';
+        const followsSystemTheme = document.documentElement.dataset.themeMode === 'auto';
         let currentTheme = document.documentElement.dataset.theme || 'dark';
         let mermaidIdCounter = 0;
         let sseConnected = false;
@@ -993,14 +605,6 @@
         let ovFitMode = 'width';
         let ovDragging = false, ovStartX = 0, ovStartY = 0, ovStartL = 0, ovStartT = 0;
 
-        const setStatus = (t) => { if (statusEl) statusEl.textContent = t || ''; };
-        const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-        function setConnectionState(state) {
-            statusDot.className = 'status-dot' + (state === 'connected' ? ' connected' : state === 'error' ? ' error' : '');
-            statusDot.title = state === 'connected' ? 'Connected' : state === 'error' ? 'Disconnected' : 'Connecting...';
-        }
-
         function showContent() {
             if (loadingSkeleton) loadingSkeleton.style.display = 'none';
             contentEl.style.display = '';
@@ -1010,26 +614,12 @@
         function applyTheme(theme) {
             currentTheme = theme;
             document.documentElement.setAttribute('data-theme', theme);
-            const themeIcon = $('themeIcon');
-            if (themeIcon) themeIcon.innerHTML = theme === 'dark' ? MOON_SVG : SUN_SVG;
-            const hljsLink = $('hljs-theme');
-            if (hljsLink) {
-                hljsLink.href = theme === 'dark'
-                    ? 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css'
-                    : 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css';
-            }
             mermaid.initialize({
                 startOnLoad: false,
                 theme: theme === 'dark' ? 'dark' : 'default',
                 securityLevel: 'strict',
             });
         }
-
-        themeBtn.addEventListener('click', () => {
-            followsSystemTheme = false;
-            applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
-            renderAllMermaidBlocks();
-        });
 
         systemThemeQuery.addEventListener('change', (event) => {
             if (!followsSystemTheme) return;
@@ -1305,7 +895,6 @@
         async function sync(initial = false) {
             const text = await fetchContent();
             if (text == null) {
-                if (initial) setStatus('Waiting for content...');
                 return;
             }
             if (!initial && text === lastContent) return;
@@ -1359,12 +948,10 @@
 
                 attachCopyButtons();
 
-                setStatus('Updated ' + nowTime());
             } catch (e) {
                 console.error('[markdown-preview] render error:', e);
                 contentEl.innerHTML = '<pre style="white-space:pre-wrap;padding:1rem">' +
                     text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>';
-                setStatus('Render error: ' + e.message);
             }
         }
 
@@ -1437,11 +1024,9 @@
             evtSource.addEventListener('open', () => {
                 console.log('[markdown-preview] SSE connected');
                 sseConnected = true;
-                setConnectionState('connected');
             });
             evtSource.addEventListener('error', () => {
                 sseConnected = false;
-                setConnectionState('error');
             });
             return evtSource;
         }
