@@ -86,6 +86,7 @@ The preview opens a polished browser app with:
   - Hover a diagram to reveal the **expand button**
   - Click to open a **fullscreen overlay** with zoom, pan, fit-to-width/height, and SVG export
 - **Dark / Light theme** follows the system color scheme automatically
+- **Structured front matter** — YAML metadata renders as a collapsible card with tags, links, nested fields, source view, and copy support
 - **Per-diagram error handling** — if one mermaid block is invalid, only that block shows an error; the rest of the page renders fine
 - **LaTeX math rendering** — `$E = mc^2$` inline and `$$\int_0^\infty$$` display math via KaTeX, plus `\begin{equation}` environments
 - **Scroll sync** — browser follows your cursor position with line-level precision
@@ -274,6 +275,7 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - [Mermaid](https://mermaid.js.org/) — diagram engine
 - [highlight.js](https://highlightjs.org/) — syntax highlighting
 - [morphdom](https://github.com/patrick-steele-idem/morphdom) — DOM diffing
+- [yaml](https://eemeli.org/yaml/) — on-demand browser-side front matter parsing
 
 ---
 

@@ -294,27 +294,242 @@
 
         /* ── Front matter panel ───────────────────────────────────────── */
         #fm-panel {
-            margin: 0 0 1.2rem;
-            border: 1px solid var(--stroke);
-            border-radius: 8px;
-            background: var(--panel);
-            font-size: .85rem;
+            width: calc(100% - 64px);
+            max-width: 916px;
+            margin: 32px auto 0;
+            border: 1px solid var(--md-border, var(--stroke));
+            border-radius: 12px;
+            background: var(--md-kbd-bg, var(--panel));
+            color: var(--md-fg, var(--fg));
+            font-family: var(--md-font-sans, sans-serif);
+            font-size: .875rem;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
         }
 
-        #fm-panel summary {
-            padding: .45em .9em;
+        #fm-panel > summary {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+            padding: .7rem .9rem;
             cursor: pointer;
-            color: var(--fg-muted);
+            color: var(--md-muted, var(--fg-muted));
             user-select: none;
+            list-style: none;
         }
 
-        #fm-panel pre {
+        #fm-panel > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        #fm-panel > summary::before {
+            content: "";
+            width: .45rem;
+            height: .45rem;
+            border-right: 1.5px solid currentColor;
+            border-bottom: 1.5px solid currentColor;
+            transform: rotate(-45deg);
+            transition: transform .15s ease;
+            flex: 0 0 auto;
+        }
+
+        #fm-panel[open] > summary::before {
+            transform: rotate(45deg) translate(-1px, -1px);
+        }
+
+        .fm-title {
+            color: var(--md-fg, var(--fg));
+            font-weight: 600;
+        }
+
+        .fm-format {
+            margin-left: auto;
+            padding: .12rem .4rem;
+            border: 1px solid var(--md-border, var(--stroke));
+            border-radius: 999px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: .68rem;
+            font-weight: 600;
+            letter-spacing: .04em;
+        }
+
+        #fm-content {
+            padding: .25rem .9rem .9rem;
+            border-top: 1px solid var(--md-border, var(--stroke));
+        }
+
+        .fm-grid {
+            display: grid;
+            grid-template-columns: minmax(7rem, max-content) minmax(0, 1fr);
+            margin-top: .35rem;
+        }
+
+        .fm-row {
+            display: contents;
+        }
+
+        .fm-key,
+        .fm-value {
+            padding: .45rem .25rem;
+            border-bottom: 1px solid var(--md-border-muted, var(--stroke));
+        }
+
+        .fm-row:last-child > .fm-key,
+        .fm-row:last-child > .fm-value {
+            border-bottom: 0;
+        }
+
+        .fm-key {
+            padding-right: 1.25rem;
+            color: var(--md-muted, var(--fg-muted));
+            font-weight: 500;
+            overflow-wrap: anywhere;
+        }
+
+        .fm-value {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .fm-value a {
+            color: var(--md-link, var(--link));
+            text-decoration: none;
+        }
+
+        .fm-value a:hover {
+            text-decoration: underline;
+        }
+
+        .fm-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+        }
+
+        .fm-chip,
+        .fm-bool,
+        .fm-null {
+            display: inline-flex;
+            align-items: center;
+            padding: .12rem .45rem;
+            border-radius: 999px;
+            background: var(--md-code-bg, var(--badge-bg));
+            font-size: .78rem;
+            line-height: 1.45;
+        }
+
+        .fm-bool[data-value="true"] {
+            color: var(--md-alert-tip, #1a7f37);
+        }
+
+        .fm-bool[data-value="false"],
+        .fm-null {
+            color: var(--md-muted, var(--fg-muted));
+        }
+
+        .fm-list {
             margin: 0;
-            padding: .6em .9em;
-            border-top: 1px solid var(--stroke);
-            white-space: pre-wrap;
-            color: var(--fg-muted);
-            font-size: .82rem;
+            padding-left: 1.25rem;
+        }
+
+        .fm-nested {
+            border-left: 2px solid var(--md-border, var(--stroke));
+            padding-left: .7rem;
+        }
+
+        .fm-nested > summary {
+            display: list-item;
+            padding: 0;
+            color: var(--md-muted, var(--fg-muted));
+            font-size: .8rem;
+        }
+
+        .fm-source {
+            margin-top: .7rem;
+            border-top: 1px solid var(--md-border, var(--stroke));
+        }
+
+        .fm-source > summary {
+            display: list-item;
+            padding: .65rem .1rem 0;
+            color: var(--md-muted, var(--fg-muted));
+            font-size: .78rem;
+        }
+
+        .fm-source-wrap {
+            position: relative;
+            margin-top: .55rem;
+        }
+
+        #fm-panel .fm-source pre {
+            margin: 0;
+            padding: .75rem;
+            overflow: auto;
+            border: 1px solid var(--md-border, var(--stroke));
+            border-radius: 8px;
+            background: var(--md-pre-bg, var(--code-bg));
+            white-space: pre;
+        }
+
+        #fm-panel .fm-source code {
+            font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: .78rem;
+        }
+
+        .fm-copy {
+            position: absolute;
+            top: .4rem;
+            right: .4rem;
+            padding: .2rem .45rem;
+            border: 1px solid var(--md-border, var(--stroke));
+            border-radius: 6px;
+            background: var(--md-kbd-bg, var(--panel));
+            color: var(--md-muted, var(--fg-muted));
+            cursor: pointer;
+            font: inherit;
+            font-size: .72rem;
+        }
+
+        .fm-copy:hover {
+            color: var(--md-fg, var(--fg));
+        }
+
+        .fm-error {
+            margin: .7rem 0 0;
+            color: var(--md-danger, var(--err-fg));
+            font-size: .8rem;
+        }
+
+        @media (max-width: 768px) {
+            #fm-panel {
+                width: calc(100% - 32px);
+                margin-top: 16px;
+            }
+
+            .fm-grid {
+                display: block;
+            }
+
+            .fm-row {
+                display: block;
+                padding: .45rem .1rem;
+                border-bottom: 1px solid var(--md-border-muted, var(--stroke));
+            }
+
+            .fm-row:last-child {
+                border-bottom: 0;
+            }
+
+            .fm-key,
+            .fm-value {
+                display: block;
+                padding: 0;
+                border: 0;
+            }
+
+            .fm-key {
+                margin-bottom: .2rem;
+            }
         }
 
         /* ── Mermaid diagrams ──────────────────────────────────────────── */
@@ -477,8 +692,11 @@
     </div>
 
     <details id="fm-panel" style="display:none">
-        <summary>Front matter</summary>
-        <pre id="fm-content"></pre>
+        <summary>
+            <span class="fm-title">Document metadata</span>
+            <span class="fm-format">YAML</span>
+        </summary>
+        <div id="fm-content"></div>
     </details>
     <div id="content" style="display:none"></div>
 
@@ -663,7 +881,9 @@
         // the #fm-panel <details> (mode "panel") or is dropped ("hide");
         // mode "raw" skips the rule so the text renders as ordinary markdown.
         const YAML_MODE = document.documentElement.dataset.yamlMode || 'panel';
+        const YAML_MODULE_URL = 'https://cdn.jsdelivr.net/npm/yaml@2.9.0/+esm';
         let capturedFrontMatter = null;
+        let yamlModulePromise = null;
         if (YAML_MODE !== 'raw') {
             md.block.ruler.before('table', 'front_matter', function (state, startLine, endLine, silent) {
                 if (startLine !== 0 || state.blkIndent !== 0) return false;
@@ -684,13 +904,184 @@
             }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
         }
 
-        function updateFrontMatterPanel() {
+        function loadYamlModule() {
+            if (!yamlModulePromise) yamlModulePromise = import(YAML_MODULE_URL);
+            return yamlModulePromise;
+        }
+
+        function frontMatterText(value) {
+            if (value === null || value === undefined) return 'null';
+            return String(value);
+        }
+
+        function appendFrontMatterScalar(parent, value) {
+            if (value === null || value === undefined) {
+                const nullValue = document.createElement('span');
+                nullValue.className = 'fm-null';
+                nullValue.textContent = 'null';
+                parent.appendChild(nullValue);
+                return;
+            }
+            if (typeof value === 'boolean') {
+                const booleanValue = document.createElement('span');
+                booleanValue.className = 'fm-bool';
+                booleanValue.dataset.value = String(value);
+                booleanValue.textContent = value ? 'Yes' : 'No';
+                parent.appendChild(booleanValue);
+                return;
+            }
+            const text = frontMatterText(value);
+            if (typeof value === 'string' && /^(?:https?:\/\/|mailto:)/i.test(text)) {
+                const link = document.createElement('a');
+                link.href = text;
+                link.textContent = text;
+                if (/^https?:\/\//i.test(text)) {
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                }
+                parent.appendChild(link);
+                return;
+            }
+            parent.appendChild(document.createTextNode(text));
+        }
+
+        function renderFrontMatterGrid(object, seen, depth) {
+            const grid = document.createElement('div');
+            grid.className = 'fm-grid';
+            Object.entries(object).forEach(([key, value]) => {
+                const row = document.createElement('div');
+                row.className = 'fm-row';
+                const keyElement = document.createElement('div');
+                keyElement.className = 'fm-key';
+                keyElement.textContent = key;
+                const valueElement = document.createElement('div');
+                valueElement.className = 'fm-value';
+                valueElement.appendChild(renderFrontMatterValue(value, seen, depth + 1));
+                row.append(keyElement, valueElement);
+                grid.appendChild(row);
+            });
+            return grid;
+        }
+
+        function renderFrontMatterValue(value, seen, depth = 0) {
+            const container = document.createElement('div');
+            if (value === null || typeof value !== 'object') {
+                appendFrontMatterScalar(container, value);
+                return container;
+            }
+            if (seen.has(value)) {
+                container.className = 'fm-null';
+                container.textContent = 'Circular reference';
+                return container;
+            }
+            seen.add(value);
+            if (Array.isArray(value)) {
+                if (value.length === 0) {
+                    container.className = 'fm-null';
+                    container.textContent = 'Empty list';
+                } else if (value.every(item => item === null || typeof item !== 'object')) {
+                    container.className = 'fm-chips';
+                    value.forEach(item => {
+                        const chip = document.createElement('span');
+                        chip.className = 'fm-chip';
+                        appendFrontMatterScalar(chip, item);
+                        container.appendChild(chip);
+                    });
+                } else {
+                    const list = document.createElement('ol');
+                    list.className = 'fm-list';
+                    value.forEach(item => {
+                        const listItem = document.createElement('li');
+                        listItem.appendChild(renderFrontMatterValue(item, seen, depth + 1));
+                        list.appendChild(listItem);
+                    });
+                    container.appendChild(list);
+                }
+            } else {
+                const entries = Object.entries(value);
+                if (entries.length === 0) {
+                    container.className = 'fm-null';
+                    container.textContent = 'Empty object';
+                } else {
+                    const nested = document.createElement('details');
+                    nested.className = 'fm-nested';
+                    nested.open = depth < 1;
+                    const summary = document.createElement('summary');
+                    summary.textContent = `${entries.length} ${entries.length === 1 ? 'field' : 'fields'}`;
+                    nested.append(summary, renderFrontMatterGrid(value, seen, depth));
+                    container.appendChild(nested);
+                }
+            }
+            seen.delete(value);
+            return container;
+        }
+
+        function appendFrontMatterSource(parent, sourceText, errorMessage) {
+            if (errorMessage) {
+                const error = document.createElement('p');
+                error.className = 'fm-error';
+                error.textContent = errorMessage;
+                parent.appendChild(error);
+            }
+            const source = document.createElement('details');
+            source.className = 'fm-source';
+            source.open = Boolean(errorMessage);
+            const summary = document.createElement('summary');
+            summary.textContent = errorMessage ? 'Raw YAML' : 'View YAML source';
+            const wrap = document.createElement('div');
+            wrap.className = 'fm-source-wrap';
+            const pre = document.createElement('pre');
+            pre.className = 'hljs';
+            const code = document.createElement('code');
+            if (window.hljs && window.hljs.getLanguage('yaml')) {
+                code.innerHTML = window.hljs.highlight(sourceText, {
+                    language: 'yaml',
+                    ignoreIllegals: true,
+                }).value;
+            } else {
+                code.textContent = sourceText;
+            }
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'fm-copy';
+            copy.textContent = 'Copy';
+            copy.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(sourceText);
+                    copy.textContent = 'Copied';
+                    setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
+                } catch (_) { }
+            });
+            pre.appendChild(code);
+            wrap.append(pre, copy);
+            source.append(summary, wrap);
+            parent.appendChild(source);
+        }
+
+        async function updateFrontMatterPanel() {
             const panel = $('fm-panel');
             if (!panel) return;
             if (YAML_MODE === 'panel' && capturedFrontMatter !== null) {
-                const pre = $('fm-content');
-                if (pre && pre.textContent !== capturedFrontMatter) pre.textContent = capturedFrontMatter;
                 panel.style.display = '';
+                const content = $('fm-content');
+                content.replaceChildren();
+                const sourceText = capturedFrontMatter;
+                try {
+                    const { parseDocument } = await loadYamlModule();
+                    if (sourceText !== capturedFrontMatter) return;
+                    const documentModel = parseDocument(sourceText, { prettyErrors: false });
+                    if (documentModel.errors.length > 0) throw documentModel.errors[0];
+                    const metadata = documentModel.toJS({ maxAliasCount: 50 });
+                    const root = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+                        ? renderFrontMatterGrid(metadata, new WeakSet(), 0)
+                        : renderFrontMatterValue(metadata, new WeakSet(), 0);
+                    content.appendChild(root);
+                    appendFrontMatterSource(content, sourceText);
+                } catch (error) {
+                    if (sourceText !== capturedFrontMatter) return;
+                    const message = error && error.message ? error.message.split('\n')[0] : 'Unable to parse YAML';
+                    appendFrontMatterSource(content, sourceText, message);
+                }
             } else {
                 panel.style.display = 'none';
             }
@@ -903,7 +1294,7 @@
             try {
                 capturedFrontMatter = null;
                 const html = md.render(text);
-                updateFrontMatterPanel();
+                await updateFrontMatterPanel();
 
                 showContent();
 
