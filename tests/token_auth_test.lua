@@ -94,6 +94,8 @@ ok(r.body:find('id="hljs%-theme"') == nil,
 ok(r.body:find("yaml@2%.9%.0/%+esm") ~= nil
 		and r.body:find("parseDocument", 1, true) ~= nil,
 	"structured front matter uses the pinned browser-side YAML parser")
+ok(r.body:find("assetPath = decodeURIComponent(src)", 1, true) ~= nil,
+	"relative image URLs are decoded before asset query encoding")
 ok(r.body:find('class="fm%-title"') ~= nil
 		and r.body:find("renderFrontMatterGrid", 1, true) ~= nil
 		and r.body:find("View YAML source", 1, true) == nil,

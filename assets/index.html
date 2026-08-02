@@ -1131,7 +1131,19 @@
             rootEl.querySelectorAll('img[src]').forEach(img => {
                 const src = img.getAttribute('src');
                 if (!src || /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|\/|#)/.test(src)) return;
-                img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(src)));
+                // Markdown image destinations are URLs, so spaces are commonly
+                // already encoded as %20. Decode that URL representation before
+                // encoding it as the asset endpoint's query parameter; otherwise
+                // `%20` becomes `%2520` and the server looks for a literal `%20`
+                // in the filename.
+                let assetPath = src;
+                try {
+                    assetPath = decodeURIComponent(src);
+                } catch (_) {
+                    // Keep malformed percent sequences unchanged. The asset
+                    // route will either find that literal filename or return 404.
+                }
+                img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(assetPath)));
             });
         }
 
