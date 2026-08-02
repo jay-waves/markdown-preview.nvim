@@ -134,8 +134,9 @@ ok(r.body:find('<dialog id="overlay"', 1, true) ~= nil
 	"Mermaid overlay uses the native dialog lifecycle")
 ok(r.body:find("@panzoom/panzoom@4%.6%.2/dist/panzoom%.min%.js") ~= nil
 		and r.body:find("window.Panzoom(svg", 1, true) ~= nil
+		and r.body:find("pinchAndPan: true", 1, true) ~= nil
 		and r.body:find("ovPanzoom.destroy()", 1, true) ~= nil,
-	"Mermaid overlay uses pinned Panzoom with lifecycle cleanup")
+	"Mermaid overlay uses pinned Panzoom with two-finger pan and lifecycle cleanup")
 ok(r.body:find("ovDragging", 1, true) == nil
 		and r.body:find("addEventListener('mousemove'", 1, true) == nil,
 	"manual overlay drag state and global mouse listeners are removed")
