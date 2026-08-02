@@ -124,16 +124,28 @@ ok(r.body:find("applyInitialScroll", 1, true) ~= nil
 		and r.body:find("lastInitialScrollId", 1, true) ~= nil,
 	"initial cursor position is consumed once without continuous scroll sync")
 ok(r.body:find('class="fm%-title"') ~= nil
-		and r.body:find("renderFrontMatterGrid", 1, true) ~= nil
+		and r.body:find("renderjson%-2@2%.0%.1/renderjson%.mjs") ~= nil
+		and r.body:find("content.replaceChildren(renderjson(metadata))", 1, true) ~= nil
 		and r.body:find("View YAML source", 1, true) == nil,
-	"front matter metadata card is present without a raw source view")
+	"front matter metadata card uses the pinned renderjson renderer")
 ok(r.body:find('<dialog id="overlay"', 1, true) ~= nil
 		and r.body:find("overlay.showModal()", 1, true) ~= nil
 		and r.body:find("overlay.classList.add('active')", 1, true) == nil,
 	"Mermaid overlay uses the native dialog lifecycle")
-ok(r.body:find("function h(tag, props", 1, true) ~= nil
-		and r.body:find("element.textContent = value", 1, true) ~= nil,
-	"front matter uses the safe local DOM builder")
+ok(r.body:find("@panzoom/panzoom@4%.6%.2/dist/panzoom%.min%.js") ~= nil
+		and r.body:find("window.Panzoom(svg", 1, true) ~= nil
+		and r.body:find("ovPanzoom.destroy()", 1, true) ~= nil,
+	"Mermaid overlay uses pinned Panzoom with lifecycle cleanup")
+ok(r.body:find("ovDragging", 1, true) == nil
+		and r.body:find("addEventListener('mousemove'", 1, true) == nil,
+	"manual overlay drag state and global mouse listeners are removed")
+ok(r.body:find('id="ovExport"', 1, true) ~= nil
+		and r.body:find('id="ovZoomIn"', 1, true) == nil
+		and r.body:find('id="ovFitWidth"', 1, true) == nil,
+	"Mermaid overlay keeps export while removing redundant zoom controls")
+ok(r.body:find("function h(tag, props", 1, true) == nil
+		and r.body:find("renderFrontMatterGrid", 1, true) == nil,
+	"custom front matter DOM renderer is removed")
 ok(r.body:find("function attachCopyButtons", 1, true) == nil
 		and r.body:find("e.target.closest('.copy-btn')", 1, true) ~= nil,
 	"code copy actions use one delegated listener")

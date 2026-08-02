@@ -23,78 +23,30 @@
         /* ── CSS Variables ─────────────────────────────────────────────── */
         :root {
             color-scheme: dark;
-            --bg: #0d1117;
-            --panel: #161b22;
-            --stroke: #30363d;
-            --fg: #e6edf3;
-            --fg-muted: #8b949e;
-            --link: #58a6ff;
-            --code-bg: #1b2028;
-            --blockquote-border: #3b434b;
-            --table-border: #30363d;
-            --table-row-alt: rgba(255, 255, 255, .03);
+            --bg: var(--md-bg, #0d1117);
+            --panel: var(--md-kbd-bg, #161b22);
+            --stroke: var(--md-border, #30363d);
+            --fg: var(--md-fg, #e6edf3);
+            --fg-muted: var(--md-muted, #8b949e);
+            --link: var(--md-link, #58a6ff);
             --err-bg: rgba(239, 68, 68, .12);
             --err-border: rgba(239, 68, 68, .35);
-            --err-fg: #fecaca;
+            --err-fg: var(--md-danger, #fecaca);
             --scroll-track: transparent;
             --scroll-thumb: rgba(148, 163, 184, .35);
-            --scroll-thumb-hover: rgba(148, 163, 184, .6);
-            --accent: #58a6ff;
-            --badge-bg: rgba(255, 255, 255, .06);
-            --badge-fg: #8b949e;
+            --badge-bg: var(--md-code-bg, rgba(255, 255, 255, .06));
+            --badge-fg: var(--md-muted, #8b949e);
             --skeleton: rgba(255, 255, 255, .04);
             --skeleton-shine: rgba(255, 255, 255, .08);
-            /* GitHub callout colors (dark) */
-            --color-note: #2f81f7;
-            --color-tip: #3fb950;
-            --color-warning: #d29922;
-            --color-caution: #f85149;
-            --color-important: #a371f7;
-            /* Heading accent colors */
-            --color-h1: #58a6ff;
-            --color-h2: #a371f7;
-            --color-h3: #3fb950;
-            --color-h4: #39d2c0;
-            --color-h5: #d29922;
-            --color-h6: #8b949e;
         }
 
         [data-theme="light"] {
             color-scheme: light;
-            --bg: #ffffff;
-            --panel: #f6f8fa;
-            --stroke: #d0d7de;
-            --fg: #1f2328;
-            --fg-muted: #656d76;
-            --link: #0969da;
-            --code-bg: #f6f8fa;
-            --blockquote-border: #d0d7de;
-            --table-border: #d0d7de;
-            --table-row-alt: rgba(0, 0, 0, .02);
             --err-bg: rgba(239, 68, 68, .08);
             --err-border: #fecaca;
-            --err-fg: #7f1d1d;
-            --scroll-track: transparent;
             --scroll-thumb: rgba(100, 116, 139, .4);
-            --scroll-thumb-hover: rgba(100, 116, 139, .65);
-            --accent: #0969da;
-            --badge-bg: rgba(0, 0, 0, .04);
-            --badge-fg: #656d76;
             --skeleton: rgba(0, 0, 0, .04);
             --skeleton-shine: rgba(0, 0, 0, .07);
-            /* GitHub callout colors (light) */
-            --color-note: #0969da;
-            --color-tip: #1a7f37;
-            --color-warning: #9a6700;
-            --color-caution: #d1242f;
-            --color-important: #8250df;
-            /* Heading accent colors */
-            --color-h1: #0969da;
-            --color-h2: #8250df;
-            --color-h3: #1a7f37;
-            --color-h4: #0e8a7e;
-            --color-h5: #9a6700;
-            --color-h6: #656d76;
         }
 
         /* ── Reset & base ──────────────────────────────────────────────── */
@@ -140,11 +92,6 @@
         .btn:hover {
             background: rgba(127, 127, 127, .1);
             color: var(--fg);
-        }
-
-        .btn-text {
-            width: auto;
-            padding: .35rem .65rem;
         }
 
         /* ── Loading skeleton ─────────────────────────────────────────── */
@@ -343,98 +290,27 @@
         }
 
         #fm-content {
-            padding: .25rem .9rem .9rem;
+            padding: .7rem .9rem .9rem;
             border-top: 1px solid var(--md-border, var(--stroke));
+            overflow: auto;
         }
 
-        .fm-grid {
-            display: grid;
-            grid-template-columns: minmax(7rem, max-content) minmax(0, 1fr);
-            margin-top: .35rem;
+        #fm-content .renderjson {
+            font: .82rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+            white-space: pre;
         }
 
-        .fm-row {
-            display: contents;
-        }
-
-        .fm-key,
-        .fm-value {
-            padding: .45rem .25rem;
-            border-bottom: 1px solid var(--md-border-muted, var(--stroke));
-        }
-
-        .fm-row:last-child > .fm-key,
-        .fm-row:last-child > .fm-value {
-            border-bottom: 0;
-        }
-
-        .fm-key {
-            padding-right: 1.25rem;
-            color: var(--md-muted, var(--fg-muted));
-            font-weight: 500;
-            overflow-wrap: anywhere;
-        }
-
-        .fm-value {
-            min-width: 0;
-            overflow-wrap: anywhere;
-        }
-
-        .fm-value a {
-            color: var(--md-link, var(--link));
-            text-decoration: none;
-        }
-
-        .fm-value a:hover {
-            text-decoration: underline;
-        }
-
-        .fm-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .35rem;
-        }
-
-        .fm-chip,
-        .fm-bool,
-        .fm-null {
-            display: inline-flex;
-            align-items: center;
-            padding: .12rem .45rem;
-            border-radius: 999px;
-            background: var(--md-code-bg, var(--badge-bg));
-            font-size: .78rem;
-            line-height: 1.45;
-        }
-
-        .fm-bool[data-value="true"] {
-            color: var(--md-alert-tip, #1a7f37);
-        }
-
-        .fm-bool[data-value="false"],
-        .fm-null {
-            color: var(--md-muted, var(--fg-muted));
-        }
-
-        .fm-list {
-            margin: 0;
-            padding-left: 1.25rem;
-        }
-
-        .fm-nested {
-            border-left: 2px solid var(--md-border, var(--stroke));
-            padding-left: .7rem;
-        }
-
-        .fm-nested > summary {
-            display: list-item;
-            padding: 0;
-            color: var(--md-muted, var(--fg-muted));
-            font-size: .8rem;
-        }
+        #fm-content .renderjson a { color: var(--md-link, var(--link)); text-decoration: none }
+        #fm-content .renderjson .disclosure { color: var(--md-muted, var(--fg-muted)); cursor: pointer }
+        #fm-content .renderjson .key { color: var(--md-fg, var(--fg)) }
+        #fm-content .renderjson .string { color: var(--md-alert-tip, #1a7f37) }
+        #fm-content .renderjson .number,
+        #fm-content .renderjson .boolean { color: var(--md-alert-important, #8250df) }
+        #fm-content .renderjson .keyword,
+        #fm-content .renderjson .syntax { color: var(--md-muted, var(--fg-muted)) }
 
         .fm-error {
-            margin: .7rem .25rem .45rem;
+            margin: 0;
             color: var(--md-danger, var(--err-fg));
             font-size: .8rem;
         }
@@ -445,30 +321,6 @@
                 margin-top: 16px;
             }
 
-            .fm-grid {
-                display: block;
-            }
-
-            .fm-row {
-                display: block;
-                padding: .45rem .1rem;
-                border-bottom: 1px solid var(--md-border-muted, var(--stroke));
-            }
-
-            .fm-row:last-child {
-                border-bottom: 0;
-            }
-
-            .fm-key,
-            .fm-value {
-                display: block;
-                padding: 0;
-                border: 0;
-            }
-
-            .fm-key {
-                margin-bottom: .2rem;
-            }
         }
 
         /* ── Mermaid diagrams ──────────────────────────────────────────── */
@@ -559,49 +411,37 @@
             background: var(--bg);
         }
 
-        #overlay-toolbar {
+        #overlay-actions {
+            position: absolute;
+            z-index: 1;
+            top: 1rem;
+            right: 1rem;
             display: flex;
+            flex-direction: column;
             gap: .4rem;
-            align-items: center;
-            padding: .5rem 1rem;
+        }
+
+        #overlay-actions .btn {
+            width: 2.5rem;
+            height: 2.5rem;
+            padding: 0;
             background: var(--panel);
-            border-bottom: 1px solid var(--stroke);
-            flex-wrap: wrap;
-        }
-
-        #overlay-toolbar .sep {
-            width: 1px;
-            height: 24px;
-            background: var(--stroke);
-            margin: 0 .2rem;
-        }
-
-        #overlay-toolbar .grow {
-            flex: 1
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
         }
 
         #overlay-panzoom {
             flex: 1;
-            overflow: auto;
-            cursor: grab;
-            scrollbar-width: thin;
-            scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+            overflow: hidden;
         }
 
         #overlay-panzoom-inner {
-            min-width: 100%;
-            min-height: 100%;
+            width: 100%;
+            height: 100%;
             box-sizing: border-box;
             padding: 1rem;
             display: flex;
             justify-content: center;
-            align-items: flex-start;
-            width: max-content;
-            height: max-content;
-        }
-
-        #overlay-panzoom.dragging {
-            cursor: grabbing
+            align-items: center;
         }
 
         #overlay-panzoom-inner svg {
@@ -648,23 +488,11 @@
 
     <!-- Fullscreen overlay for diagram zoom/pan -->
     <dialog id="overlay" aria-label="Expanded Mermaid diagram">
-        <div id="overlay-toolbar">
-            <span style="font-weight:600;font-size:.9rem">Diagram</span>
-            <div class="sep"></div>
-            <span style="font-size:.82rem;color:var(--fg-muted)">Zoom:</span>
-            <button id="ovZoomOut" class="btn" title="Zoom out">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <div id="overlay-actions">
+            <button id="ovExport" class="btn" title="Export SVG" aria-label="Export SVG">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <button id="ovZoomReset" class="btn btn-text" title="Reset zoom" style="font-size:.78rem">100%</button>
-            <button id="ovZoomIn" class="btn" title="Zoom in">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            </button>
-            <div class="sep"></div>
-            <button id="ovFitWidth" class="btn btn-text" title="Fit to width" style="font-size:.78rem">Fit width</button>
-            <button id="ovFitHeight" class="btn btn-text" title="Fit height" style="font-size:.78rem">Fit height</button>
-            <div class="grow"></div>
-            <button id="ovExport" class="btn btn-text" title="Export SVG" style="font-size:.78rem">Export SVG</button>
-            <button id="ovClose" class="btn" title="Close (Esc)">
+            <button id="ovClose" class="btn" title="Close (Esc)" aria-label="Close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
         </div>
@@ -680,12 +508,14 @@
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js"></script>
     <script src="https://unpkg.com/markdown-it-anchor@9.2.0/dist/markdownItAnchor.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/texmath.js"></script>
 
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         import markdownItGithubAlerts from 'https://unpkg.com/markdown-it-github-alerts@1.0.1/dist/index.mjs';
+        import renderjson from 'https://cdn.jsdelivr.net/npm/renderjson-2@2.0.1/renderjson.mjs';
 
         const BOTTOM_PADDING = parseFloat(document.documentElement.dataset.bottomPadding) || 0.5;
 
@@ -698,11 +528,6 @@
         const overlay = $('overlay');
         const overlayPanzoom = $('overlay-panzoom');
         const overlayPanzoomInner = $('overlay-panzoom-inner');
-        const ovZoomIn = $('ovZoomIn');
-        const ovZoomOut = $('ovZoomOut');
-        const ovZoomReset = $('ovZoomReset');
-        const ovFitWidth = $('ovFitWidth');
-        const ovFitHeight = $('ovFitHeight');
         const ovExport = $('ovExport');
         const ovClose = $('ovClose');
 
@@ -761,10 +586,7 @@
 
         // Overlay state
         let ovSvgSource = '';
-        let ovBaseW = 0, ovBaseH = 0;
-        let ovZoom = 1;
-        let ovFitMode = 'width';
-        let ovDragging = false, ovStartX = 0, ovStartY = 0, ovStartL = 0, ovStartT = 0;
+        let ovPanzoom = null;
 
         function showContent() {
             if (loadingSkeleton) loadingSkeleton.style.display = 'none';
@@ -873,102 +695,7 @@
             return yamlModulePromise;
         }
 
-        // Small, safe DOM builder for trusted element/attribute names. Dynamic
-        // front-matter values are assigned through textContent, never HTML.
-        function h(tag, props = {}, ...children) {
-            const element = document.createElement(tag);
-            for (const [key, value] of Object.entries(props)) {
-                if (value === undefined || value === null || value === false) continue;
-                if (key === 'class') element.className = value;
-                else if (key === 'text') element.textContent = value;
-                else if (key in element) element[key] = value;
-                else element.setAttribute(key, value === true ? '' : String(value));
-            }
-            element.append(...children.filter(child => child !== undefined && child !== null));
-            return element;
-        }
-
-        function appendFrontMatterScalar(parent, value) {
-            if (value === null || value === undefined) {
-                parent.append(h('span', { class: 'fm-null', text: 'null' }));
-                return;
-            }
-            if (typeof value === 'boolean') {
-                parent.append(h('span', {
-                    class: 'fm-bool',
-                    'data-value': String(value),
-                    text: value ? 'Yes' : 'No',
-                }));
-                return;
-            }
-            const text = String(value);
-            if (typeof value === 'string' && /^(?:https?:\/\/|mailto:)/i.test(text)) {
-                const external = /^https?:\/\//i.test(text);
-                parent.append(h('a', {
-                    href: text,
-                    text,
-                    target: external ? '_blank' : undefined,
-                    rel: external ? 'noopener noreferrer' : undefined,
-                }));
-                return;
-            }
-            parent.append(text);
-        }
-
-        function renderFrontMatterGrid(object, seen, depth) {
-            return h('div', { class: 'fm-grid' }, ...Object.entries(object).map(([key, value]) =>
-                h('div', { class: 'fm-row' },
-                    h('div', { class: 'fm-key', text: key }),
-                    h('div', { class: 'fm-value' }, renderFrontMatterValue(value, seen, depth + 1))
-                )
-            ));
-        }
-
-        function renderFrontMatterValue(value, seen, depth = 0) {
-            const container = document.createElement('div');
-            if (value === null || typeof value !== 'object') {
-                appendFrontMatterScalar(container, value);
-                return container;
-            }
-            if (seen.has(value)) {
-                container.className = 'fm-null';
-                container.textContent = 'Circular reference';
-                return container;
-            }
-            seen.add(value);
-            if (Array.isArray(value)) {
-                if (value.length === 0) {
-                    container.className = 'fm-null';
-                    container.textContent = 'Empty list';
-                } else if (value.every(item => item === null || typeof item !== 'object')) {
-                    container.className = 'fm-chips';
-                    value.forEach(item => {
-                        const chip = h('span', { class: 'fm-chip' });
-                        appendFrontMatterScalar(chip, item);
-                        container.append(chip);
-                    });
-                } else {
-                    container.append(h('ol', { class: 'fm-list' }, ...value.map(item =>
-                        h('li', {}, renderFrontMatterValue(item, seen, depth + 1))
-                    )));
-                }
-            } else {
-                const entries = Object.entries(value);
-                if (entries.length === 0) {
-                    container.className = 'fm-null';
-                    container.textContent = 'Empty object';
-                } else {
-                    container.append(h('details', { class: 'fm-nested', open: depth < 1 },
-                        h('summary', {
-                            text: `${entries.length} ${entries.length === 1 ? 'field' : 'fields'}`,
-                        }),
-                        renderFrontMatterGrid(value, seen, depth)
-                    ));
-                }
-            }
-            seen.delete(value);
-            return container;
-        }
+        renderjson.set_show_to_level(1);
 
         async function updateFrontMatterPanel() {
             const panel = $('fm-panel');
@@ -984,18 +711,15 @@
                     const documentModel = parseDocument(sourceText, { prettyErrors: false });
                     if (documentModel.errors.length > 0) throw documentModel.errors[0];
                     const metadata = documentModel.toJS({ maxAliasCount: 50 });
-                    const root = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
-                        ? renderFrontMatterGrid(metadata, new WeakSet(), 0)
-                        : renderFrontMatterValue(metadata, new WeakSet(), 0);
-                    content.appendChild(root);
+                    content.replaceChildren(renderjson(metadata));
                 } catch (error) {
                     if (sourceText !== capturedFrontMatter) return;
-                    content.append(h('p', {
-                        class: 'fm-error',
-                        text: error && error.message
-                            ? error.message.split('\n')[0]
-                            : 'Unable to parse YAML',
-                    }));
+                    const message = document.createElement('p');
+                    message.className = 'fm-error';
+                    message.textContent = error && error.message
+                        ? error.message.split('\n')[0]
+                        : 'Unable to parse YAML';
+                    content.append(message);
                 }
             } else {
                 panel.style.display = 'none';
@@ -1373,21 +1097,15 @@
             if (!overlay.open) overlay.showModal();
 
             const svg = overlayPanzoomInner.querySelector('svg');
-            if (svg) {
-                const vb = svg.getAttribute('viewBox');
-                if (vb) {
-                    const parts = vb.trim().split(/\s+/).map(Number);
-                    if (parts.length === 4) { ovBaseW = parts[2]; ovBaseH = parts[3]; }
-                } else {
-                    ovBaseW = parseFloat(svg.getAttribute('width')) || 800;
-                    ovBaseH = parseFloat(svg.getAttribute('height')) || 600;
-                }
+            if (svg && window.Panzoom) {
+                ovPanzoom = window.Panzoom(svg, {
+                    canvas: true,
+                    minScale: 0.1,
+                    maxScale: 8,
+                });
+            } else if (svg) {
+                console.error('[markdown-preview] Panzoom failed to load');
             }
-
-            ovZoom = 1;
-            ovFitMode = 'width';
-            updateOverlayFit();
-            updateOverlayFitBtns();
         }
 
         function closeOverlay() {
@@ -1395,65 +1113,17 @@
         }
 
         overlay.addEventListener('close', () => {
+            if (ovPanzoom) ovPanzoom.destroy();
+            ovPanzoom = null;
             overlayPanzoomInner.replaceChildren();
             ovSvgSource = '';
-            ovDragging = false;
         });
 
-        function applyOverlayZoom() {
-            const svg = overlayPanzoomInner.querySelector('svg');
-            if (!svg || !ovBaseW || !ovBaseH) return;
-            svg.removeAttribute('style');
-            svg.removeAttribute('width');
-            svg.removeAttribute('height');
-            svg.setAttribute('width', String(Math.max(1, Math.round(ovBaseW * ovZoom))));
-            svg.setAttribute('height', String(Math.max(1, Math.round(ovBaseH * ovZoom))));
-            ovZoomReset.textContent = Math.round(ovZoom * 100) + '%';
-        }
-
-        function updateOverlayFit() {
-            if (!ovBaseW || !ovBaseH) return;
-            const cw = overlayPanzoom.clientWidth || ovBaseW;
-            const ch = overlayPanzoom.clientHeight || ovBaseH;
-            if (ovFitMode === 'width') ovZoom = cw / ovBaseW;
-            else if (ovFitMode === 'height') ovZoom = ch / ovBaseH;
-            ovZoom = Math.min(8, Math.max(0.1, ovZoom));
-            applyOverlayZoom();
-        }
-
-        function updateOverlayFitBtns() {
-            ovFitWidth.style.borderColor = ovFitMode === 'width' ? 'var(--accent)' : '';
-            ovFitHeight.style.borderColor = ovFitMode === 'height' ? 'var(--accent)' : '';
-        }
-
-        ovZoomIn.addEventListener('click', () => { ovFitMode = 'none'; ovZoom *= 1.2; applyOverlayZoom(); updateOverlayFitBtns(); });
-        ovZoomOut.addEventListener('click', () => { ovFitMode = 'none'; ovZoom /= 1.2; applyOverlayZoom(); updateOverlayFitBtns(); });
-        ovZoomReset.addEventListener('click', () => { ovFitMode = 'none'; ovZoom = 1; applyOverlayZoom(); updateOverlayFitBtns(); });
-        ovFitWidth.addEventListener('click', () => { ovFitMode = ovFitMode === 'width' ? 'none' : 'width'; updateOverlayFit(); updateOverlayFitBtns(); });
-        ovFitHeight.addEventListener('click', () => { ovFitMode = ovFitMode === 'height' ? 'none' : 'height'; updateOverlayFit(); updateOverlayFitBtns(); });
-
-        // Overlay pan (drag)
-        overlayPanzoom.addEventListener('mousedown', (e) => {
-            ovDragging = true; overlayPanzoom.classList.add('dragging');
-            ovStartX = e.clientX; ovStartY = e.clientY;
-            ovStartL = overlayPanzoom.scrollLeft; ovStartT = overlayPanzoom.scrollTop;
-        });
-        window.addEventListener('mousemove', (e) => {
-            if (!ovDragging) return;
-            overlayPanzoom.scrollLeft = ovStartL - (e.clientX - ovStartX);
-            overlayPanzoom.scrollTop = ovStartT - (e.clientY - ovStartY);
-        });
-        window.addEventListener('mouseup', () => { ovDragging = false; overlayPanzoom.classList.remove('dragging'); });
-
-        // Overlay wheel zoom
+        // Panzoom handles pointer/touch gestures; add wheel zoom explicitly.
         overlayPanzoom.addEventListener('wheel', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                ovFitMode = 'none';
-                ovZoom *= e.deltaY > 0 ? (1 / 1.1) : 1.1;
-                applyOverlayZoom();
-                updateOverlayFitBtns();
-            }
+            if (!ovPanzoom) return;
+            e.preventDefault();
+            ovPanzoom.zoomWithWheel(e);
         }, { passive: false });
 
         // Export SVG from overlay
@@ -1469,17 +1139,6 @@
 
         // Close overlay
         ovClose.addEventListener('click', closeOverlay);
-
-        // Resize handler for overlay fit
-        let ovResizeTimer = null;
-        window.addEventListener('resize', () => {
-            clearTimeout(ovResizeTimer);
-            ovResizeTimer = setTimeout(() => {
-                if (overlay.open && ovFitMode !== 'none') {
-                    updateOverlayFit();
-                }
-            }, 80);
-        });
 
         // ── Delegated content actions ─────────────────────────────────
         contentEl.addEventListener('click', async (e) => {

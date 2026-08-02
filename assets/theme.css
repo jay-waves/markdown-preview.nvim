@@ -782,8 +782,3 @@ html[data-theme="dark"] {
 #content mjx-container svg {
   font-size: 15px;
 }
-
-html,
-body {
-  background-color: var(--md-bg);
-}
