@@ -37,12 +37,6 @@ function M.read_text(path)
 	return data
 end
 
-function M.copy_file(src, dst)
-	assert(type(src) == "string" and #src > 0, "copy_file: source path is nil")
-	local data = M.read_text(src)
-	M.write_text(dst, data)
-end
-
 ---Resolve a file shipped with the plugin using runtimepath first.
 ---@param rel string
 ---@return string|nil

@@ -539,16 +539,24 @@
 
         /* ── Fullscreen overlay (mermaid zoom/pan) ─────────────────────── */
         #overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 100;
+            width: 100vw;
+            height: 100vh;
+            max-width: none;
+            max-height: none;
+            margin: 0;
+            padding: 0;
+            border: 0;
             background: var(--bg);
+            color: var(--fg);
+        }
+
+        #overlay[open] {
+            display: flex;
             flex-direction: column;
         }
 
-        #overlay.active {
-            display: flex
+        #overlay::backdrop {
+            background: var(--bg);
         }
 
         #overlay-toolbar {
@@ -639,7 +647,7 @@
     <div id="content" style="display:none"></div>
 
     <!-- Fullscreen overlay for diagram zoom/pan -->
-    <div id="overlay">
+    <dialog id="overlay" aria-label="Expanded Mermaid diagram">
         <div id="overlay-toolbar">
             <span style="font-weight:600;font-size:.9rem">Diagram</span>
             <div class="sep"></div>
@@ -661,7 +669,7 @@
             </button>
         </div>
         <div id="overlay-panzoom"><div id="overlay-panzoom-inner"></div></div>
-    </div>
+    </dialog>
 
     <!-- CDN deps: markdown-it, morphdom, highlight.js, emoji, footnote, anchor -->
     <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
@@ -708,7 +716,6 @@
         const followsSystemTheme = document.documentElement.dataset.themeMode === 'auto';
         let currentTheme = document.documentElement.dataset.theme || 'dark';
         let mermaidIdCounter = 0;
-        let sseConnected = false;
         const loadedPacks = new Set();
 
         // Live-reload auth token. Either substituted into the document by
@@ -744,16 +751,13 @@
         let lastScrollData = null;
 
         // Pause scroll sync briefly when user scrolls the browser manually
-        window.addEventListener('wheel', () => {
+        function pauseScrollSync() {
             scrollSyncPaused = true;
             clearTimeout(scrollSyncPauseTimer);
             scrollSyncPauseTimer = setTimeout(() => { scrollSyncPaused = false; }, 3000);
-        }, { passive: true });
-        window.addEventListener('touchmove', () => {
-            scrollSyncPaused = true;
-            clearTimeout(scrollSyncPauseTimer);
-            scrollSyncPauseTimer = setTimeout(() => { scrollSyncPaused = false; }, 3000);
-        }, { passive: true });
+        }
+        window.addEventListener('wheel', pauseScrollSync, { passive: true });
+        window.addEventListener('touchmove', pauseScrollSync, { passive: true });
 
         // Overlay state
         let ovSvgSource = '';
@@ -781,7 +785,7 @@
         systemThemeQuery.addEventListener('change', (event) => {
             if (!followsSystemTheme) return;
             applyTheme(event.matches ? 'dark' : 'light');
-            renderAllMermaidBlocks();
+            renderAllMermaidBlocks(true);
         });
 
         // ── Markdown-it setup ─────────────────────────────────────────
@@ -869,58 +873,55 @@
             return yamlModulePromise;
         }
 
-        function frontMatterText(value) {
-            if (value === null || value === undefined) return 'null';
-            return String(value);
+        // Small, safe DOM builder for trusted element/attribute names. Dynamic
+        // front-matter values are assigned through textContent, never HTML.
+        function h(tag, props = {}, ...children) {
+            const element = document.createElement(tag);
+            for (const [key, value] of Object.entries(props)) {
+                if (value === undefined || value === null || value === false) continue;
+                if (key === 'class') element.className = value;
+                else if (key === 'text') element.textContent = value;
+                else if (key in element) element[key] = value;
+                else element.setAttribute(key, value === true ? '' : String(value));
+            }
+            element.append(...children.filter(child => child !== undefined && child !== null));
+            return element;
         }
 
         function appendFrontMatterScalar(parent, value) {
             if (value === null || value === undefined) {
-                const nullValue = document.createElement('span');
-                nullValue.className = 'fm-null';
-                nullValue.textContent = 'null';
-                parent.appendChild(nullValue);
+                parent.append(h('span', { class: 'fm-null', text: 'null' }));
                 return;
             }
             if (typeof value === 'boolean') {
-                const booleanValue = document.createElement('span');
-                booleanValue.className = 'fm-bool';
-                booleanValue.dataset.value = String(value);
-                booleanValue.textContent = value ? 'Yes' : 'No';
-                parent.appendChild(booleanValue);
+                parent.append(h('span', {
+                    class: 'fm-bool',
+                    'data-value': String(value),
+                    text: value ? 'Yes' : 'No',
+                }));
                 return;
             }
-            const text = frontMatterText(value);
+            const text = String(value);
             if (typeof value === 'string' && /^(?:https?:\/\/|mailto:)/i.test(text)) {
-                const link = document.createElement('a');
-                link.href = text;
-                link.textContent = text;
-                if (/^https?:\/\//i.test(text)) {
-                    link.target = '_blank';
-                    link.rel = 'noopener noreferrer';
-                }
-                parent.appendChild(link);
+                const external = /^https?:\/\//i.test(text);
+                parent.append(h('a', {
+                    href: text,
+                    text,
+                    target: external ? '_blank' : undefined,
+                    rel: external ? 'noopener noreferrer' : undefined,
+                }));
                 return;
             }
-            parent.appendChild(document.createTextNode(text));
+            parent.append(text);
         }
 
         function renderFrontMatterGrid(object, seen, depth) {
-            const grid = document.createElement('div');
-            grid.className = 'fm-grid';
-            Object.entries(object).forEach(([key, value]) => {
-                const row = document.createElement('div');
-                row.className = 'fm-row';
-                const keyElement = document.createElement('div');
-                keyElement.className = 'fm-key';
-                keyElement.textContent = key;
-                const valueElement = document.createElement('div');
-                valueElement.className = 'fm-value';
-                valueElement.appendChild(renderFrontMatterValue(value, seen, depth + 1));
-                row.append(keyElement, valueElement);
-                grid.appendChild(row);
-            });
-            return grid;
+            return h('div', { class: 'fm-grid' }, ...Object.entries(object).map(([key, value]) =>
+                h('div', { class: 'fm-row' },
+                    h('div', { class: 'fm-key', text: key }),
+                    h('div', { class: 'fm-value' }, renderFrontMatterValue(value, seen, depth + 1))
+                )
+            ));
         }
 
         function renderFrontMatterValue(value, seen, depth = 0) {
@@ -942,20 +943,14 @@
                 } else if (value.every(item => item === null || typeof item !== 'object')) {
                     container.className = 'fm-chips';
                     value.forEach(item => {
-                        const chip = document.createElement('span');
-                        chip.className = 'fm-chip';
+                        const chip = h('span', { class: 'fm-chip' });
                         appendFrontMatterScalar(chip, item);
-                        container.appendChild(chip);
+                        container.append(chip);
                     });
                 } else {
-                    const list = document.createElement('ol');
-                    list.className = 'fm-list';
-                    value.forEach(item => {
-                        const listItem = document.createElement('li');
-                        listItem.appendChild(renderFrontMatterValue(item, seen, depth + 1));
-                        list.appendChild(listItem);
-                    });
-                    container.appendChild(list);
+                    container.append(h('ol', { class: 'fm-list' }, ...value.map(item =>
+                        h('li', {}, renderFrontMatterValue(item, seen, depth + 1))
+                    )));
                 }
             } else {
                 const entries = Object.entries(value);
@@ -963,13 +958,12 @@
                     container.className = 'fm-null';
                     container.textContent = 'Empty object';
                 } else {
-                    const nested = document.createElement('details');
-                    nested.className = 'fm-nested';
-                    nested.open = depth < 1;
-                    const summary = document.createElement('summary');
-                    summary.textContent = `${entries.length} ${entries.length === 1 ? 'field' : 'fields'}`;
-                    nested.append(summary, renderFrontMatterGrid(value, seen, depth));
-                    container.appendChild(nested);
+                    container.append(h('details', { class: 'fm-nested', open: depth < 1 },
+                        h('summary', {
+                            text: `${entries.length} ${entries.length === 1 ? 'field' : 'fields'}`,
+                        }),
+                        renderFrontMatterGrid(value, seen, depth)
+                    ));
                 }
             }
             seen.delete(value);
@@ -996,12 +990,12 @@
                     content.appendChild(root);
                 } catch (error) {
                     if (sourceText !== capturedFrontMatter) return;
-                    const message = document.createElement('p');
-                    message.className = 'fm-error';
-                    message.textContent = error && error.message
-                        ? error.message.split('\n')[0]
-                        : 'Unable to parse YAML';
-                    content.appendChild(message);
+                    content.append(h('p', {
+                        class: 'fm-error',
+                        text: error && error.message
+                            ? error.message.split('\n')[0]
+                            : 'Unable to parse YAML',
+                    }));
                 }
             } else {
                 panel.style.display = 'none';
@@ -1071,7 +1065,8 @@
             // tree matches the live tree and code blocks patch in place.
             const langMatch = html.match(/^<pre[^>]*\bdata-lang="([^"]*)"/);
             const badge = langMatch ? `<span class="code-lang">${langMatch[1]}</span>` : '';
-            return `<div class="code-wrap">${badge}${html}</div>`;
+            return `<div class="code-wrap">${badge}${html}` +
+                `<button class="copy-btn" title="Copy code">${COPY_ICON}</button></div>`;
         };
 
         // ── Iconify auto-detection ────────────────────────────────────
@@ -1095,6 +1090,10 @@
         // ── Mermaid rendering ─────────────────────────────────────────
         const lastGoodSvg = {};
 
+        function removeMermaidErrorArtifacts(block) {
+            block.querySelectorAll('.error,.error-icon,.error-text,.errorText').forEach(node => node.remove());
+        }
+
         async function renderMermaidBlock(block) {
             const source = decodeURIComponent(block.dataset.mermaidSource || '');
             if (!source.trim()) return;
@@ -1115,7 +1114,7 @@
                 block.classList.remove('mermaid-errored');
                 lastGoodSvg[block.id] = svg;
 
-                block.querySelectorAll('.error,.error-icon,.error-text,.errorText').forEach(n => n.remove());
+                removeMermaidErrorArtifacts(block);
             } catch (e) {
                 block.classList.add('mermaid-errored');
                 const fallback = lastGoodSvg[block.id];
@@ -1132,12 +1131,13 @@
                     .split('\n').find(Boolean) || 'Invalid diagram';
                 errEl.textContent = msg.replace(/\s*mermaid version\s*\d+(?:\.\d+)*\s*$/i, '').trim();
 
-                block.querySelectorAll('.error,.error-icon,.error-text,.errorText').forEach(n => n.remove());
+                removeMermaidErrorArtifacts(block);
             }
         }
 
-        async function renderAllMermaidBlocks() {
-            const blocks = contentEl.querySelectorAll('.mermaid-block[data-mermaid-source]');
+        async function renderAllMermaidBlocks(force = false) {
+            const selector = '.mermaid-block[data-mermaid-source]' + (force ? '' : ':not(.mermaid-rendered)');
+            const blocks = contentEl.querySelectorAll(selector);
             for (const block of blocks) {
                 await renderMermaidBlock(block);
             }
@@ -1196,33 +1196,6 @@
                     img.removeAttribute('src');
                     img.setAttribute('data-invalid-src', src);
                 }
-            });
-        }
-
-        function attachCopyButtons() {
-            contentEl.querySelectorAll('.code-wrap').forEach(wrap => {
-                if (wrap.querySelector('.copy-btn')) return;
-                const pre = wrap.querySelector('pre');
-                if (!pre) return;
-                const btn = document.createElement('button');
-                btn.className = 'copy-btn';
-                btn.title = 'Copy code';
-                btn.innerHTML = COPY_ICON;
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const code = pre.querySelector('code');
-                    if (!code) return;
-                    try {
-                        await navigator.clipboard.writeText(code.textContent);
-                        btn.innerHTML = CHECK_ICON;
-                        btn.classList.add('copied');
-                        setTimeout(() => {
-                            btn.innerHTML = COPY_ICON;
-                            btn.classList.remove('copied');
-                        }, 1500);
-                    } catch (_) { }
-                });
-                wrap.appendChild(btn);
             });
         }
 
@@ -1296,12 +1269,7 @@
                 }
                 applyBottomPadding();
 
-                const blocks = contentEl.querySelectorAll('.mermaid-block[data-mermaid-source]:not(.mermaid-rendered)');
-                for (const block of blocks) {
-                    await renderMermaidBlock(block);
-                }
-
-                attachCopyButtons();
+                await renderAllMermaidBlocks();
                 await applyInitialScroll();
 
             } catch (e) {
@@ -1394,10 +1362,6 @@
             });
             evtSource.addEventListener('open', () => {
                 console.log('[markdown-preview] SSE connected');
-                sseConnected = true;
-            });
-            evtSource.addEventListener('error', () => {
-                sseConnected = false;
             });
             return evtSource;
         }
@@ -1406,7 +1370,7 @@
         function openOverlay(svgHtml) {
             ovSvgSource = svgHtml;
             overlayPanzoomInner.innerHTML = svgHtml;
-            overlay.classList.add('active');
+            if (!overlay.open) overlay.showModal();
 
             const svg = overlayPanzoomInner.querySelector('svg');
             if (svg) {
@@ -1427,9 +1391,14 @@
         }
 
         function closeOverlay() {
-            overlay.classList.remove('active');
-            overlayPanzoomInner.innerHTML = '';
+            if (overlay.open) overlay.close();
         }
+
+        overlay.addEventListener('close', () => {
+            overlayPanzoomInner.replaceChildren();
+            ovSvgSource = '';
+            ovDragging = false;
+        });
 
         function applyOverlayZoom() {
             const svg = overlayPanzoomInner.querySelector('svg');
@@ -1500,25 +1469,37 @@
 
         // Close overlay
         ovClose.addEventListener('click', closeOverlay);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && overlay.classList.contains('active')) {
-                closeOverlay();
-            }
-        });
 
         // Resize handler for overlay fit
         let ovResizeTimer = null;
         window.addEventListener('resize', () => {
             clearTimeout(ovResizeTimer);
             ovResizeTimer = setTimeout(() => {
-                if (overlay.classList.contains('active') && ovFitMode !== 'none') {
+                if (overlay.open && ovFitMode !== 'none') {
                     updateOverlayFit();
                 }
             }, 80);
         });
 
-        // ── Event delegation for expand buttons ───────────────────────
-        contentEl.addEventListener('click', (e) => {
+        // ── Delegated content actions ─────────────────────────────────
+        contentEl.addEventListener('click', async (e) => {
+            const copyBtn = e.target.closest('.copy-btn');
+            if (copyBtn) {
+                e.stopPropagation();
+                const code = copyBtn.closest('.code-wrap')?.querySelector('code');
+                if (!code) return;
+                try {
+                    await navigator.clipboard.writeText(code.textContent);
+                    copyBtn.innerHTML = CHECK_ICON;
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.innerHTML = COPY_ICON;
+                        copyBtn.classList.remove('copied');
+                    }, 1500);
+                } catch (_) {}
+                return;
+            }
+
             const expandBtn = e.target.closest('[data-expand]');
             if (expandBtn) {
                 const blockId = expandBtn.dataset.expand;

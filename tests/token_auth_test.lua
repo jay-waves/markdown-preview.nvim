@@ -127,6 +127,16 @@ ok(r.body:find('class="fm%-title"') ~= nil
 		and r.body:find("renderFrontMatterGrid", 1, true) ~= nil
 		and r.body:find("View YAML source", 1, true) == nil,
 	"front matter metadata card is present without a raw source view")
+ok(r.body:find('<dialog id="overlay"', 1, true) ~= nil
+		and r.body:find("overlay.showModal()", 1, true) ~= nil
+		and r.body:find("overlay.classList.add('active')", 1, true) == nil,
+	"Mermaid overlay uses the native dialog lifecycle")
+ok(r.body:find("function h(tag, props", 1, true) ~= nil
+		and r.body:find("element.textContent = value", 1, true) ~= nil,
+	"front matter uses the safe local DOM builder")
+ok(r.body:find("function attachCopyButtons", 1, true) == nil
+		and r.body:find("e.target.closest('.copy-btn')", 1, true) ~= nil,
+	"code copy actions use one delegated listener")
 local theme_pos = r.body:find("custom%-theme%-marker")
 local highlight_pos = r.body:find("custom%-highlight%-marker")
 ok(theme_pos ~= nil and highlight_pos ~= nil and theme_pos < highlight_pos,
