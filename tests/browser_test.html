@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>markdown-preview.nvim browser checks</title>
+    <style>
+        :root { color-scheme: dark; font-family: system-ui, sans-serif }
+        body { max-width: 960px; margin: 0 auto; padding: 2rem; background: #0d1117; color: #e6edf3 }
+        h1 { margin-bottom: .5rem }
+        p { color: #9da7b3; line-height: 1.6 }
+        .grid { display: grid; gap: .8rem; margin: 1rem 0 2rem }
+        .card { padding: 1rem; border: 1px solid #3d444d; border-radius: 10px; background: #151b23 }
+        .card p { margin: 0 0 .35rem; color: #e6edf3 }
+        .status { font-weight: 700 }
+        .pending { color: #9da7b3 }
+        .pass { color: #57ab5a }
+        .fail { color: #e5534b }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js"></script>
+</head>
+<body>
+    <h1>Browser checks</h1>
+    <p>Open this file directly in a browser. All checks run automatically using the same CDN dependencies as the preview. No Node installation or downloaded test browser is required.</p>
+    <strong id="summary" class="status pending">Running...</strong>
+    <div id="automatic" class="grid"></div>
+
+    <script>
+        function reportFatal(error) {
+            const summary = document.getElementById('summary');
+            if (!summary) return;
+            summary.className = 'status fail';
+            summary.textContent = 'FAIL - ' + (error?.message || String(error));
+        }
+        window.addEventListener('error', event => reportFatal(event.error || event.message));
+        window.addEventListener('unhandledrejection', event => reportFatal(event.reason));
+    </script>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        import { parseDocument } from 'https://cdn.jsdelivr.net/npm/yaml@2.9.0/+esm';
+        import renderjson from 'https://cdn.jsdelivr.net/npm/renderjson-2@2.0.1/renderjson.mjs';
+
+        const automatic = document.getElementById('automatic');
+        const summary = document.getElementById('summary');
+
+        const checks = [
+            {
+                name: 'DOMPurify security and layout allowlist',
+                run() {
+                    const scriptPayload = '<scr' + 'ipt>alert(1)</scr' + 'ipt>';
+                    const dirty = '<mark>kept</mark><img src="ok.png" onerror="alert(1)">' +
+                        '<a href="javascript:alert(1)">bad</a>' + scriptPayload +
+                        '<svg><filter id="blur"><feGaussianBlur stdDeviation="1"/></filter><rect width="5" height="5"/></svg>';
+                    const clean = window.DOMPurify.sanitize(dirty, {
+                        USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
+                        ALLOW_DATA_ATTR: true,
+                    });
+                    const root = document.createElement('div');
+                    root.innerHTML = clean;
+                    for (const selector of ['mark', 'img', 'svg', 'filter']) {
+                        if (!root.querySelector(selector)) throw new Error(`Allowed ${selector} element was removed`);
+                    }
+                    if (root.querySelector('script, [onerror]')) throw new Error('Unsafe nodes or event attributes remain');
+                    if (root.querySelector('a')?.getAttribute('href')) throw new Error('Unsafe URL remains');
+                },
+            },
+            {
+                name: 'Markdown raw HTML is sanitized',
+                run() {
+                    const md = window.markdownit({ html: true });
+                    const clean = window.DOMPurify.sanitize(md.render('<mark>layout</mark><img src=x onerror=alert(1)>'));
+                    if (!clean.includes('<mark>layout</mark>') || clean.includes('onerror')) throw new Error('Unexpected sanitized Markdown output');
+                },
+            },
+            {
+                name: 'YAML + renderjson front matter',
+                run() {
+                    const doc = parseDocument('title: Hello\ntags: [lua, neovim]\nnested:\n  enabled: true');
+                    if (doc.errors.length) throw doc.errors[0];
+                    renderjson.set_show_to_level(1);
+                    const tree = renderjson(doc.toJS());
+                    if (!tree.matches('.renderjson') || !tree.textContent.includes('Hello')) {
+                        throw new Error('Front matter tree was not rendered');
+                    }
+                },
+            },
+            {
+                name: 'Mermaid syntax parsing',
+                async run() {
+                    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark' });
+                    const result = await mermaid.parse('flowchart LR\n  A --> B');
+                    if (!result) throw new Error('Mermaid did not accept valid syntax');
+                },
+            },
+        ];
+
+        function resultCard(name, state, detail = '') {
+            const card = document.createElement('div');
+            card.className = 'card';
+            const description = document.createElement('p');
+            description.textContent = name;
+            const status = document.createElement('span');
+            status.className = `status ${state}`;
+            status.textContent = state === 'pass' ? 'PASS' : `FAIL${detail ? ` - ${detail}` : ''}`;
+            card.append(description, status);
+            return card;
+        }
+
+        async function runChecks() {
+            automatic.replaceChildren();
+            let passed = 0;
+            for (const check of checks) {
+                try {
+                    await check.run();
+                    automatic.append(resultCard(check.name, 'pass'));
+                    passed++;
+                } catch (error) {
+                    automatic.append(resultCard(check.name, 'fail', error?.message || String(error)));
+                }
+            }
+            summary.className = `status ${passed === checks.length ? 'pass' : 'fail'}`;
+            summary.textContent = `${passed}/${checks.length} passed`;
+        }
+
+        runChecks();
+    </script>
+</body>
+</html>

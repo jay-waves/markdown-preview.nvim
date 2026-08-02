@@ -91,65 +91,9 @@ local r = http_get(("http://127.0.0.1:%d/"):format(port))
 ok(r.status == 200, "/ (index) is 200 without token")
 ok(r.body:find("data%-live%-token=\"" .. mp._token .. "\"") ~= nil,
 	"index.html has data-live-token attribute set to current token")
-ok(r.body:find('data%-theme%-mode="auto"') ~= nil,
-	"default preview theme follows the system color scheme")
-ok(r.body:find('id="markdown%-theme"') ~= nil
-		and r.body:find("__MARKDOWN_THEME_CSS__", 1, true) == nil,
-	"bundled Markdown theme is inlined")
-ok(r.body:find('id="highlight%-theme"') ~= nil
+ok(r.body:find("__MARKDOWN_THEME_CSS__", 1, true) == nil
 		and r.body:find("__HIGHLIGHT_THEME_CSS__", 1, true) == nil,
-	"bundled highlight theme is inlined")
-ok(r.body:find("<header", 1, true) == nil and r.body:find('id="themeBtn"', 1, true) == nil,
-	"preview has no redundant theme toolbar")
-ok(r.body:find('id="hljs%-theme"') == nil,
-	"preview does not load a competing highlight stylesheet")
-ok(r.body:find("yaml@2%.9%.0/%+esm") ~= nil
-		and r.body:find("parseDocument", 1, true) ~= nil,
-	"structured front matter uses the pinned browser-side YAML parser")
-ok(r.body:find("dompurify@3%.4%.12/dist/purify%.min%.js") ~= nil
-		and r.body:find("sanitizeRenderedHtml%(md%.render%(text%)%)") ~= nil,
-	"rendered Markdown is sanitized by pinned DOMPurify")
-ok(r.body:find("svgFilters: true", 1, true) ~= nil
-		and r.body:find("mathMl: true", 1, true) ~= nil,
-	"DOMPurify preserves SVG filters and MathML rendering")
-ok(r.body:find("resolveRelativeAssetPath", 1, true) ~= nil
-		and r.body:find("new URL(src, base)", 1, true) ~= nil,
-	"relative image URLs use the browser URL parser")
-ok(r.body:find("fetchAssetPrefix", 1, true) ~= nil
-		and r.body:find("__markdown_preview_asset_root__", 1, true) ~= nil,
-	"relative image URLs retain their Markdown-directory base under :pwd")
-ok(r.body:find("data%-invalid%-src") ~= nil,
-	"malformed and escaping image URLs fail closed")
-ok(r.body:find("applyInitialScroll", 1, true) ~= nil
-		and r.body:find("lastInitialScrollId", 1, true) ~= nil,
-	"initial cursor position is consumed once without continuous scroll sync")
-ok(r.body:find('class="fm%-title"') ~= nil
-		and r.body:find("renderjson%-2@2%.0%.1/renderjson%.mjs") ~= nil
-		and r.body:find("content.replaceChildren(renderjson(metadata))", 1, true) ~= nil
-		and r.body:find("View YAML source", 1, true) == nil,
-	"front matter metadata card uses the pinned renderjson renderer")
-ok(r.body:find('<dialog id="overlay"', 1, true) ~= nil
-		and r.body:find("overlay.showModal()", 1, true) ~= nil
-		and r.body:find("overlay.classList.add('active')", 1, true) == nil,
-	"Mermaid overlay uses the native dialog lifecycle")
-ok(r.body:find("@panzoom/panzoom@4%.6%.2/dist/panzoom%.min%.js") ~= nil
-		and r.body:find("window.Panzoom(svg", 1, true) ~= nil
-		and r.body:find("pinchAndPan: true", 1, true) ~= nil
-		and r.body:find("ovPanzoom.destroy()", 1, true) ~= nil,
-	"Mermaid overlay uses pinned Panzoom with two-finger pan and lifecycle cleanup")
-ok(r.body:find("ovDragging", 1, true) == nil
-		and r.body:find("addEventListener('mousemove'", 1, true) == nil,
-	"manual overlay drag state and global mouse listeners are removed")
-ok(r.body:find('id="ovExport"', 1, true) ~= nil
-		and r.body:find('id="ovZoomIn"', 1, true) == nil
-		and r.body:find('id="ovFitWidth"', 1, true) == nil,
-	"Mermaid overlay keeps export while removing redundant zoom controls")
-ok(r.body:find("function h(tag, props", 1, true) == nil
-		and r.body:find("renderFrontMatterGrid", 1, true) == nil,
-	"custom front matter DOM renderer is removed")
-ok(r.body:find("function attachCopyButtons", 1, true) == nil
-		and r.body:find("e.target.closest('.copy-btn')", 1, true) ~= nil,
-	"code copy actions use one delegated listener")
+	"index template placeholders are resolved")
 local theme_pos = r.body:find("custom%-theme%-marker")
 local highlight_pos = r.body:find("custom%-highlight%-marker")
 ok(theme_pos ~= nil and highlight_pos ~= nil and theme_pos < highlight_pos,

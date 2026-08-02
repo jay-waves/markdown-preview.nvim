@@ -321,6 +321,13 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 
 ---
 
+## Testing
+
+- `tests/token_auth_test.lua` covers the Neovim lifecycle, token-protected HTTP routes, relative asset boundaries, buffer following, and cleanup.
+- Open `tests/browser_test.html` directly in a browser for browser-side checks. They run automatically and report a green or red status for each dependency; no Node installation or downloaded test browser is required.
+
+---
+
 ## Project structure
 
 ```
