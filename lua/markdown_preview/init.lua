@@ -50,6 +50,9 @@ M.config = {
 	-- Enables %%{init: {"layout": "elk"}}%% in diagrams.
 	mermaid_elk = false,
 
+	-- Scroll to the current Markdown line once when opening/retargeting the
+	-- preview. Unlike scroll_sync, later cursor movement is not followed.
+	initial_scroll = true,
 	scroll_sync = false, -- sync browser scroll to cursor position
 	click_to_nvim = true, -- click a rendered block to scroll Neovim to its source
 
@@ -459,6 +462,26 @@ local function write_content(dir, text, bufnr)
 	return path
 end
 
+local function write_initial_scroll(dir, bufnr)
+	local payload = ""
+	if M.config.initial_scroll ~= false then
+		local winid = vim.api.nvim_get_current_win()
+		if vim.api.nvim_get_current_buf() ~= bufnr then
+			local wins = vim.fn.win_findbuf(bufnr)
+			winid = wins[1]
+		end
+		if winid then
+			local line = vim.api.nvim_win_get_cursor(winid)[1] - 1
+			payload = vim.json.encode({
+				id = tostring(vim.loop.hrtime()) .. ":" .. tostring(vim.fn.getpid()),
+				line = line,
+				total = vim.api.nvim_buf_line_count(bufnr),
+			})
+		end
+	end
+	pcall(util.write_text, vim.fs.joinpath(dir, "initial_scroll"), payload)
+end
+
 ---------------------------------------------------------------------------
 -- Refresh logic
 ---------------------------------------------------------------------------
@@ -682,6 +705,7 @@ function M.start()
 			M._takeover_port = lock_data.port
 			M._token = lock_data.token
 			write_content(dir, text, bufnr)
+			write_initial_scroll(dir, bufnr)
 			M._last_text_by_buf[bufnr] = text
 			set_autocmds_for_buffer(bufnr)
 			if type(M.config.hooks.on_start) == "function" then
@@ -702,6 +726,7 @@ function M.start()
 	ensure_click_server()
 	write_index_if_needed(dir)
 	write_content(dir, text, bufnr)
+	write_initial_scroll(dir, bufnr)
 	M._last_text_by_buf[bufnr] = text
 
 	set_autocmds_for_buffer(bufnr)
@@ -713,7 +738,7 @@ function M.start()
 
 	-- The asset_root sidecar is gated too: it holds the source file's
 	-- directory path, which is nobody's business but ours.
-	local protected = { content_path_pattern, "^/asset_root$", "^/asset_prefix$" }
+	local protected = { content_path_pattern, "^/asset_root$", "^/asset_prefix$", "^/initial_scroll$" }
 	if not host_is_loopback() then
 		-- On a network bind the index page must be gated too: it is the
 		-- browser's bootstrap document, and serving it openly would hand the

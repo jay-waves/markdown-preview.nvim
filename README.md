@@ -7,7 +7,8 @@ Live **Markdown preview** for Neovim with first-class **Mermaid diagram** suppor
 - Renders your entire `.md` file in the browser — headings, tables, code blocks, everything
 - **Relative images work** — paths are resolved from the `.md` file and may use `..` while remaining inside Neovim's `:pwd`
 - **Mermaid diagrams** render inline as interactive SVGs (click to expand, zoom, pan, export)
-- **Instant updates** via Server-Sent Events (no polling), with optional **scroll sync**
+- **Initial position restore** — opens at the current Markdown line without following later cursor movement
+- **Instant updates** via Server-Sent Events (no polling), with optional continuous **scroll sync**
 - **Click-to-Neovim** — click a rendered Markdown block to scroll its Neovim instance to the source
 - **LaTeX math** — inline `$...$` and display `$$...$$` rendered via KaTeX
 - **Syntax highlighting** for code blocks (highlight.js)
@@ -139,7 +140,8 @@ require("markdown_preview").setup({
 
   allow_raw_html = true,                -- render raw HTML in markdown; set false for untrusted files (see Security)
 
-  scroll_sync = false,                  -- opt in: browser follows Neovim's cursor
+  initial_scroll = true,                -- scroll to current line once when opening/retargeting
+  scroll_sync = false,                  -- opt in: continuously follow Neovim's cursor
   click_to_nvim = true,                 -- click a rendered block to scroll Neovim
 
   -- Fraction (0–1): vertical position of the final line when scrolled to end.

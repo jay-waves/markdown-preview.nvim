@@ -1286,6 +1286,7 @@
                 }
 
                 attachCopyButtons();
+                await applyInitialScroll();
 
             } catch (e) {
                 console.error('[markdown-preview] render error:', e);
@@ -1343,6 +1344,21 @@
 
             // Center the target line in the viewport
             window.scrollTo({ top: Math.max(0, offsetTop - window.innerHeight / 2) });
+        }
+
+        let lastInitialScrollId = null;
+
+        async function applyInitialScroll() {
+            try {
+                const resp = await fetch(withToken('/initial_scroll'), { cache: 'no-store' });
+                if (!resp.ok) return;
+                const text = (await resp.text()).trim();
+                if (!text) return;
+                const data = JSON.parse(text);
+                if (!data.id || data.id === lastInitialScrollId || data.line == null) return;
+                lastInitialScrollId = data.id;
+                scrollToSourceLine(data.line, data.total || 1);
+            } catch (_) {}
         }
 
         // ── SSE (Server-Sent Events from live-server.nvim) ────────────

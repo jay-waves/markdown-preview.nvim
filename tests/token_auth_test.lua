@@ -105,6 +105,9 @@ ok(r.body:find("assetPath = decodeURIComponent(src)", 1, true) ~= nil,
 ok(r.body:find("fetchAssetPrefix", 1, true) ~= nil
 		and r.body:find("assetPrefix %+ '/' %+ assetPath") ~= nil,
 	"relative image URLs retain their Markdown-directory base under :pwd")
+ok(r.body:find("applyInitialScroll", 1, true) ~= nil
+		and r.body:find("lastInitialScrollId", 1, true) ~= nil,
+	"initial cursor position is consumed once without continuous scroll sync")
 ok(r.body:find('class="fm%-title"') ~= nil
 		and r.body:find("renderFrontMatterGrid", 1, true) ~= nil
 		and r.body:find("View YAML source", 1, true) == nil,
