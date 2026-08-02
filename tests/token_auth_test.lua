@@ -102,6 +102,9 @@ ok(r.body:find("svgFilters: true", 1, true) ~= nil
 	"DOMPurify preserves SVG filters and MathML rendering")
 ok(r.body:find("assetPath = decodeURIComponent(src)", 1, true) ~= nil,
 	"relative image URLs are decoded before asset query encoding")
+ok(r.body:find("fetchAssetPrefix", 1, true) ~= nil
+		and r.body:find("assetPrefix %+ '/' %+ assetPath") ~= nil,
+	"relative image URLs retain their Markdown-directory base under :pwd")
 ok(r.body:find('class="fm%-title"') ~= nil
 		and r.body:find("renderFrontMatterGrid", 1, true) ~= nil
 		and r.body:find("View YAML source", 1, true) == nil,

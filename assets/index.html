@@ -1149,6 +1149,19 @@
         // gated asset route, which resolves against the source file's dir.
         // Runs on the detached render tree BEFORE morphdom applies it, so
         // raw-HTML <img> tags never fire an unrewritten (404) request.
+        let assetPrefix = '';
+
+        async function fetchAssetPrefix() {
+            const previous = assetPrefix;
+            try {
+                const resp = await fetch(withToken('/asset_prefix'), { cache: 'no-store' });
+                assetPrefix = resp.ok ? (await resp.text()).trim().replace(/\\/g, '/') : '';
+            } catch (_) {
+                assetPrefix = '';
+            }
+            return assetPrefix !== previous;
+        }
+
         function rewriteRelativeImages(rootEl) {
             rootEl.querySelectorAll('img[src]').forEach(img => {
                 const src = img.getAttribute('src');
@@ -1165,7 +1178,8 @@
                     // Keep malformed percent sequences unchanged. The asset
                     // route will either find that literal filename or return 404.
                 }
-                img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(assetPath)));
+                const routedPath = assetPrefix ? assetPrefix + '/' + assetPath : assetPath;
+                img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(routedPath)));
             });
         }
 
@@ -1221,7 +1235,8 @@
             if (text == null) {
                 return;
             }
-            if (!initial && text === lastContent) return;
+            const assetPrefixChanged = await fetchAssetPrefix();
+            if (!initial && text === lastContent && !assetPrefixChanged) return;
             lastContent = text;
 
             try {

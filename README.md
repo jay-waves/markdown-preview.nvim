@@ -5,7 +5,7 @@
 Live **Markdown preview** for Neovim with first-class **Mermaid diagram** support.
 
 - Renders your entire `.md` file in the browser — headings, tables, code blocks, everything
-- **Relative images work** — `![](pic.png)` next to your `.md` file renders in the preview
+- **Relative images work** — paths are resolved from the `.md` file and may use `..` while remaining inside Neovim's `:pwd`
 - **Mermaid diagrams** render inline as interactive SVGs (click to expand, zoom, pan, export)
 - **Instant updates** via Server-Sent Events (no polling), with optional **scroll sync**
 - **Click-to-Neovim** — click a rendered Markdown block to scroll its Neovim instance to the source
@@ -286,7 +286,7 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - **Raw HTML is rendered by default** (GitHub-like), but the rendered result is sanitized in the browser by DOMPurify before it enters the DOM. Common layout HTML, images, SVG, SVG filters, MathML, and `data-*` attributes are preserved; scripts, event handlers, and dangerous URLs are removed. If DOMPurify cannot load, raw HTML fails closed and is rendered as text. Set `allow_raw_html = false` to disable raw HTML entirely.
 - **Browser libraries load from CDNs** (jsdelivr/unpkg, see *Dependencies*). Nothing from your machine is sent to them, but rendering requires internet access. Vendoring the assets locally is planned ([#27](https://github.com/selimacerbas/markdown-preview.nvim/issues/27)).
 - **`custom_css` files are inlined into the preview page** verbatim. Point it only at files you trust.
-- **Relative images are served from the previewed file's directory.** The token-gated asset route can serve *any* file at or below that directory (not just images), so on a non-loopback `host` anyone holding the tokenized URL could request other files there (`.env`, `secrets.txt`, …). Keep sensitive files out of the directory tree you preview from when binding to the network, or prefer an SSH tunnel.
+- **Relative assets are bounded by Neovim's `:pwd` by default.** Paths are resolved from the previewed Markdown file, so `../images/pic.png` works when its final real path remains inside `:pwd`. The token-gated asset route can serve *any* file inside that boundary (not just images). If the Markdown file is outside `:pwd`, the boundary safely falls back to the file's own directory. Symlinks are checked by final real path and cannot escape the boundary. Keep sensitive files such as `.env` out of the active project tree when binding to a non-loopback host, or prefer an SSH tunnel.
 - The takeover-mode lock file (which contains the session token) is written with mode `0600`.
 
 ---
@@ -300,7 +300,8 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - `explorer.exe`/`powershell.exe` require Windows interop; check `/etc/wsl.conf` for `[interop] enabled=false` or `appendWindowsPath=false`.
 
 **Images don't show**
-- Relative paths (`pic.png`, `images/pic.png`) are served from the directory of the file being previewed, via a token-gated asset route. Paths that resolve *outside* that directory (e.g. `../shared/pic.png`) are rejected for containment; keep referenced images at or below the markdown file's directory.
+- Relative paths (`pic.png`, `images/pic.png`, `../shared/pic.png`) are resolved from the directory of the file being previewed. The final real path must remain inside the current Neovim `:pwd`; run `:pwd` to inspect that boundary and `:cd /path/to/project` to change it before starting or refreshing the preview.
+- If the Markdown file is outside `:pwd`, access falls back to the Markdown file's own directory rather than widening to an unrelated working directory.
 - Absolute filesystem paths (`/home/me/pic.png`) are not supported; http(s) URLs load as usual.
 
 **Browser shows nothing or "Loading..."**

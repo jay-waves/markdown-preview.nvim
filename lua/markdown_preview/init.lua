@@ -88,6 +88,7 @@ end
 M._augroup = nil
 M._active_bufnr = nil
 M._last_text_by_buf = {}
+M._last_asset_context_by_buf = {}
 M._server_instance = nil
 M._debounce_seq = 0
 M._workspace_dir = nil
@@ -421,20 +422,40 @@ local function get_content_safe(bufnr)
 	return nil
 end
 
+local function asset_context(bufnr)
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	local src_dir = name ~= "" and vim.fs.normalize(vim.fs.dirname(name)) or nil
+	if not src_dir or src_dir == "" then return nil, "" end
+
+	-- Match :pwd, including :lcd/:tcd for the active window. Only widen the
+	-- boundary when the Markdown directory is actually inside that directory.
+	local cwd = vim.fs.normalize(vim.fn.getcwd())
+	local root_cmp = package.config:sub(1, 1) == "\\" and cwd:lower() or cwd
+	local src_cmp = package.config:sub(1, 1) == "\\" and src_dir:lower() or src_dir
+	if src_cmp == root_cmp then return cwd, "" end
+	local root_with_sep = root_cmp
+	if not root_with_sep:match("[/\\]$") then
+		root_with_sep = root_with_sep .. package.config:sub(1, 1)
+	end
+	if src_cmp:sub(1, #root_with_sep) == root_with_sep then
+		local prefix = src_dir:sub(#cwd + 1):gsub("^[/\\]+", ""):gsub("\\", "/")
+		return cwd, prefix
+	end
+	return src_dir, ""
+end
+
 local function write_content(dir, text, bufnr)
 	local path = vim.fs.joinpath(dir, M.config.content_name)
-	util.write_text(path, text)
-	-- Sidecar recording the source file's directory. The server's asset
-	-- route resolves relative image paths against it; using a file (rather
-	-- than server state) lets takeover secondaries retarget it by simply
-	-- writing into the shared workspace.
+	-- Sidecars record the allowed :pwd root and the source directory relative
+	-- to it. Writing them before content.md ensures the file-watch reload cannot
+	-- race ahead with stale asset context in takeover/follow-buffer modes.
 	if bufnr then
-		local name = vim.api.nvim_buf_get_name(bufnr)
-		local src_dir = name ~= "" and vim.fs.dirname(name) or nil
-		if src_dir and src_dir ~= "" then
-			pcall(util.write_text, vim.fs.joinpath(dir, "asset_root"), src_dir)
-		end
+		local root, prefix = asset_context(bufnr)
+		pcall(util.write_text, vim.fs.joinpath(dir, "asset_root"), root or "")
+		pcall(util.write_text, vim.fs.joinpath(dir, "asset_prefix"), prefix)
+		M._last_asset_context_by_buf[bufnr] = root and (root .. "\0" .. prefix) or nil
 	end
+	util.write_text(path, text)
 	return path
 end
 
@@ -450,7 +471,9 @@ local function maybe_refresh(bufnr, silent)
 		return false
 	end
 
-	if M._last_text_by_buf[bufnr] == text then
+	local asset_root, asset_prefix = asset_context(bufnr)
+	local asset_key = asset_root and (asset_root .. "\0" .. asset_prefix) or nil
+	if M._last_text_by_buf[bufnr] == text and M._last_asset_context_by_buf[bufnr] == asset_key then
 		return false
 	end
 
@@ -690,7 +713,7 @@ function M.start()
 
 	-- The asset_root sidecar is gated too: it holds the source file's
 	-- directory path, which is nobody's business but ours.
-	local protected = { content_path_pattern, "^/asset_root$" }
+	local protected = { content_path_pattern, "^/asset_root$", "^/asset_prefix$" }
 	if not host_is_loopback() then
 		-- On a network bind the index page must be gated too: it is the
 		-- browser's bootstrap document, and serving it openly would hand the
