@@ -60,10 +60,10 @@ M.config = {
 	allow_raw_html = true,
 
 	-- YAML front matter (--- ... --- at the top of the file):
-	-- "panel" = strip it from the preview, show in a collapsible panel above
+	-- "code"  = render its source as a syntax-highlighted YAML code block
 	-- "hide"  = strip it entirely
 	-- "raw"   = leave it in the document (renders as markdown)
-	yaml_mode = "panel",
+	yaml_mode = "code",
 
 	-- Fraction (0–1): vertical position of the final line when scrolled to end.
 	-- 0.5 = middle of viewport (default), 1.0 = bottom edge (no extra space)
@@ -173,7 +173,8 @@ local function write_index(dir)
 	end)
 	content = content:gsub("__YAML_MODE__", function()
 		local m = M.config.yaml_mode
-		if m ~= "hide" and m ~= "raw" then m = "panel" end
+		if m == "panel" then m = "code" end -- compatibility with older configs
+		if m ~= "code" and m ~= "hide" and m ~= "raw" then m = "code" end
 		return m
 	end)
 

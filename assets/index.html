@@ -239,90 +239,6 @@
             top: 26px;
         }
 
-        /* ── Front matter panel ───────────────────────────────────────── */
-        #fm-panel {
-            width: calc(100% - 64px);
-            max-width: 916px;
-            margin: 32px auto 0;
-            border: 1px solid var(--md-border, var(--stroke));
-            border-radius: 12px;
-            background: var(--md-kbd-bg, var(--panel));
-            color: var(--md-fg, var(--fg));
-            font-family: var(--md-font-sans, sans-serif);
-            font-size: .875rem;
-            overflow: hidden;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
-        }
-
-        #fm-panel > summary {
-            display: flex;
-            align-items: center;
-            gap: .65rem;
-            padding: .7rem .9rem;
-            cursor: pointer;
-            color: var(--md-muted, var(--fg-muted));
-            user-select: none;
-            list-style: none;
-        }
-
-        #fm-panel > summary::-webkit-details-marker {
-            display: none;
-        }
-
-        #fm-panel > summary::before {
-            content: "";
-            width: .45rem;
-            height: .45rem;
-            border-right: 1.5px solid currentColor;
-            border-bottom: 1.5px solid currentColor;
-            transform: rotate(-45deg);
-            transition: transform .15s ease;
-            flex: 0 0 auto;
-        }
-
-        #fm-panel[open] > summary::before {
-            transform: rotate(45deg) translate(-1px, -1px);
-        }
-
-        .fm-title {
-            color: var(--md-fg, var(--fg));
-            font-weight: 600;
-        }
-
-        #fm-content {
-            padding: .7rem .9rem .9rem;
-            border-top: 1px solid var(--md-border, var(--stroke));
-            overflow: auto;
-        }
-
-        #fm-content .renderjson {
-            font: .82rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
-            white-space: pre;
-        }
-
-        #fm-content .renderjson a { color: var(--md-link, var(--link)); text-decoration: none }
-        #fm-content .renderjson .disclosure { color: var(--md-muted, var(--fg-muted)); cursor: pointer }
-        #fm-content .renderjson .key { color: var(--md-fg, var(--fg)) }
-        #fm-content .renderjson .string { color: var(--md-alert-tip, #1a7f37) }
-        #fm-content .renderjson .number,
-        #fm-content .renderjson .boolean { color: var(--md-alert-important, #8250df) }
-        #fm-content .renderjson .keyword,
-        #fm-content .renderjson .syntax { color: var(--md-muted, var(--fg-muted)) }
-
-        .fm-error {
-            margin: 0;
-            color: var(--md-danger, var(--err-fg));
-            font-size: .8rem;
-        }
-
-        @media (max-width: 768px) {
-            #fm-panel {
-                width: calc(100% - 32px);
-                margin-top: 16px;
-            }
-
-        }
-
         /* ── Mermaid diagrams ──────────────────────────────────────────── */
         .mermaid-block {
             position: relative;
@@ -478,12 +394,6 @@
         <div class="skeleton-line"></div>
     </div>
 
-    <details id="fm-panel" style="display:none">
-        <summary>
-            <span class="fm-title">Front Matter</span>
-        </summary>
-        <div id="fm-content"></div>
-    </details>
     <div id="content" style="display:none"></div>
 
     <!-- Fullscreen overlay for diagram zoom/pan -->
@@ -515,7 +425,6 @@
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         import markdownItGithubAlerts from 'https://unpkg.com/markdown-it-github-alerts@1.0.1/dist/index.mjs';
-        import renderjson from 'https://cdn.jsdelivr.net/npm/renderjson-2@2.0.1/renderjson.mjs';
 
         const BOTTOM_PADDING = parseFloat(document.documentElement.dataset.bottomPadding) || 0.5;
 
@@ -662,14 +571,10 @@
         }
 
         // ── Front matter ──────────────────────────────────────────────
-        // Inline block rule; the CDN build of markdown-it-front-matter is
-        // CJS-only and never registered in a browser. Captured YAML goes to
-        // the #fm-panel <details> (mode "panel") or is dropped ("hide");
-        // mode "raw" skips the rule so the text renders as ordinary markdown.
-        const YAML_MODE = document.documentElement.dataset.yamlMode || 'panel';
-        const YAML_MODULE_URL = 'https://cdn.jsdelivr.net/npm/yaml@2.9.0/+esm';
-        let capturedFrontMatter = null;
-        let yamlModulePromise = null;
+        // Recognize only a leading pair of --- delimiters. "code" emits the
+        // enclosed source as an ordinary YAML fence; "hide" consumes it;
+        // "raw" leaves the document untouched. "panel" is a legacy alias.
+        const YAML_MODE = document.documentElement.dataset.yamlMode || 'code';
         if (YAML_MODE !== 'raw') {
             md.block.ruler.before('table', 'front_matter', function (state, startLine, endLine, silent) {
                 if (startLine !== 0 || state.blkIndent !== 0) return false;
@@ -678,52 +583,19 @@
                 for (let next = startLine + 1; next < endLine; next++) {
                     if (state.tShift[next] > 0) continue;
                     const line = state.src.slice(state.bMarks[next], state.eMarks[next]);
-                    if (/^-{3,}\s*$/.test(line)) { closed = next; break; }
+                    if (/^---\s*$/.test(line)) { closed = next; break; }
                 }
-                // Unlike upstream, bail out when unclosed: while the fence is
-                // still being typed, consuming to EOF would blank the preview.
                 if (closed < 0) return false;
                 if (silent) return true;
-                capturedFrontMatter = state.src.slice(state.bMarks[1], state.bMarks[closed]);
+                if (YAML_MODE !== 'hide') {
+                    const token = state.push('fence', 'code', 0);
+                    token.info = 'yaml';
+                    token.content = state.src.slice(state.bMarks[1], state.bMarks[closed]);
+                    token.map = [startLine, closed + 1];
+                }
                 state.line = closed + 1;
                 return true;
             }, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
-        }
-
-        function loadYamlModule() {
-            if (!yamlModulePromise) yamlModulePromise = import(YAML_MODULE_URL);
-            return yamlModulePromise;
-        }
-
-        renderjson.set_show_to_level(1);
-
-        async function updateFrontMatterPanel() {
-            const panel = $('fm-panel');
-            if (!panel) return;
-            if (YAML_MODE === 'panel' && capturedFrontMatter !== null) {
-                panel.style.display = '';
-                const content = $('fm-content');
-                content.replaceChildren();
-                const sourceText = capturedFrontMatter;
-                try {
-                    const { parseDocument } = await loadYamlModule();
-                    if (sourceText !== capturedFrontMatter) return;
-                    const documentModel = parseDocument(sourceText, { prettyErrors: false });
-                    if (documentModel.errors.length > 0) throw documentModel.errors[0];
-                    const metadata = documentModel.toJS({ maxAliasCount: 50 });
-                    content.replaceChildren(renderjson(metadata));
-                } catch (error) {
-                    if (sourceText !== capturedFrontMatter) return;
-                    const message = document.createElement('p');
-                    message.className = 'fm-error';
-                    message.textContent = error && error.message
-                        ? error.message.split('\n')[0]
-                        : 'Unable to parse YAML';
-                    content.append(message);
-                }
-            } else {
-                panel.style.display = 'none';
-            }
         }
 
         // Register plugins
@@ -953,9 +825,7 @@
             lastContent = text;
 
             try {
-                capturedFrontMatter = null;
                 const html = sanitizeRenderedHtml(md.render(text));
-                await updateFrontMatterPanel();
 
                 showContent();
 
@@ -1120,11 +990,22 @@
             ovSvgSource = '';
         });
 
-        // Panzoom handles pointer/touch gestures; add wheel zoom explicitly.
+        // Trackpad scrolling is a wheel event; trackpad pinch is reported as
+        // ctrl+wheel. Keep those gestures distinct instead of zooming both.
         overlayPanzoom.addEventListener('wheel', (e) => {
             if (!ovPanzoom) return;
             e.preventDefault();
-            ovPanzoom.zoomWithWheel(e);
+            if (e.ctrlKey) {
+                ovPanzoom.zoomWithWheel(e);
+                return;
+            }
+            const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? overlayPanzoom.clientHeight : 1;
+            const scale = ovPanzoom.getScale();
+            const pan = ovPanzoom.getPan();
+            ovPanzoom.pan(
+                pan.x - e.deltaX * unit / scale,
+                pan.y - e.deltaY * unit / scale
+            );
         }, { passive: false });
 
         // Export SVG from overlay

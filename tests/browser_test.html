@@ -39,8 +39,6 @@
 
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-        import { parseDocument } from 'https://cdn.jsdelivr.net/npm/yaml@2.9.0/+esm';
-        import renderjson from 'https://cdn.jsdelivr.net/npm/renderjson-2@2.0.1/renderjson.mjs';
 
         const automatic = document.getElementById('automatic');
         const summary = document.getElementById('summary');
@@ -72,18 +70,6 @@
                     const md = window.markdownit({ html: true });
                     const clean = window.DOMPurify.sanitize(md.render('<mark>layout</mark><img src=x onerror=alert(1)>'));
                     if (!clean.includes('<mark>layout</mark>') || clean.includes('onerror')) throw new Error('Unexpected sanitized Markdown output');
-                },
-            },
-            {
-                name: 'YAML + renderjson front matter',
-                run() {
-                    const doc = parseDocument('title: Hello\ntags: [lua, neovim]\nnested:\n  enabled: true');
-                    if (doc.errors.length) throw doc.errors[0];
-                    renderjson.set_show_to_level(1);
-                    const tree = renderjson(doc.toJS());
-                    if (!tree.matches('.renderjson') || !tree.textContent.includes('Hello')) {
-                        throw new Error('Front matter tree was not rendered');
-                    }
                 },
             },
             {

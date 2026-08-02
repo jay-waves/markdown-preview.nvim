@@ -84,9 +84,9 @@ The preview opens a polished browser app with:
 - **Syntax-highlighted code blocks** — powered by highlight.js, with language badges
 - **Interactive Mermaid diagrams** — rendered inline as SVGs:
   - Hover a diagram to reveal the **expand button**
-  - Click to open a **fullscreen overlay** with touch/pointer/wheel zoom, pan, and SVG export
+  - Click to open a **fullscreen overlay** with pointer/touch/trackpad pan, pinch or Ctrl-wheel zoom, and SVG export
 - **Dark / Light theme** follows the system color scheme automatically
-- **Structured front matter** — YAML metadata renders as a collapsible, expandable JSON tree
+- **Front matter** — content between leading `---` delimiters renders as a syntax-highlighted YAML code block
 - **Per-diagram error handling** — if one mermaid block is invalid, only that block shows an error; the rest of the page renders fine
 - **LaTeX math rendering** — `$E = mc^2$` inline and `$$\int_0^\infty$$` display math via KaTeX, plus `\begin{equation}` environments
 - **Scroll sync** — browser follows your cursor position with line-level precision
@@ -133,7 +133,7 @@ require("markdown_preview").setup({
 
   default_theme = "auto",               -- follow the OS; "dark" or "light" forces a theme
 
-  yaml_mode = "panel",                  -- front matter: "panel" (collapsible above preview), "hide", or "raw"
+  yaml_mode = "code",                   -- front matter: "code" (YAML block), "hide", or "raw"
 
   allow_raw_html = true,                -- render raw HTML in markdown; set false for untrusted files (see Security)
 
@@ -270,11 +270,9 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 - [DOMPurify](https://github.com/cure53/DOMPurify) — browser-side HTML/SVG/MathML sanitization
 - [KaTeX](https://katex.org/) + [markdown-it-texmath](https://github.com/goessner/markdown-it-texmath) — LaTeX math rendering
 - [Mermaid](https://mermaid.js.org/) — diagram engine
-- [Panzoom](https://github.com/timmywil/panzoom) — touch, pointer, and wheel zoom for expanded diagrams
+- [Panzoom](https://github.com/timmywil/panzoom) — touch, pointer, and pinch gestures for expanded diagrams
 - [highlight.js](https://highlightjs.org/) — syntax highlighting
 - [morphdom](https://github.com/patrick-steele-idem/morphdom) — DOM diffing
-- [yaml](https://eemeli.org/yaml/) — on-demand browser-side front matter parsing
-- [renderjson-2](https://github.com/rtritto/renderjson-2) — compact, expandable front matter tree
 
 ---
 
