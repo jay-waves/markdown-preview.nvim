@@ -94,6 +94,12 @@ ok(r.body:find('id="hljs%-theme"') == nil,
 ok(r.body:find("yaml@2%.9%.0/%+esm") ~= nil
 		and r.body:find("parseDocument", 1, true) ~= nil,
 	"structured front matter uses the pinned browser-side YAML parser")
+ok(r.body:find("dompurify@3%.4%.12/dist/purify%.min%.js") ~= nil
+		and r.body:find("sanitizeRenderedHtml%(md%.render%(text%)%)") ~= nil,
+	"rendered Markdown is sanitized by pinned DOMPurify")
+ok(r.body:find("svgFilters: true", 1, true) ~= nil
+		and r.body:find("mathMl: true", 1, true) ~= nil,
+	"DOMPurify preserves SVG filters and MathML rendering")
 ok(r.body:find("assetPath = decodeURIComponent(src)", 1, true) ~= nil,
 	"relative image URLs are decoded before asset query encoding")
 ok(r.body:find('class="fm%-title"') ~= nil

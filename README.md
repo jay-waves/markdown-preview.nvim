@@ -271,6 +271,7 @@ Rendered preview (scroll preserved, no flicker)
 
 Browser-side libraries are loaded from CDN (cached by your browser):
 - [markdown-it](https://github.com/markdown-it/markdown-it) — Markdown parser
+- [DOMPurify](https://github.com/cure53/DOMPurify) — browser-side HTML/SVG/MathML sanitization
 - [KaTeX](https://katex.org/) + [markdown-it-texmath](https://github.com/goessner/markdown-it-texmath) — LaTeX math rendering
 - [Mermaid](https://mermaid.js.org/) — diagram engine
 - [highlight.js](https://highlightjs.org/) — syntax highlighting
@@ -282,7 +283,7 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 ## Security
 
 - **Local by default.** The preview server binds to `127.0.0.1`. Your buffer content (`content.md`), the SSE stream, and the event-injection endpoint all require a per-session 128-bit token; with a non-loopback `host`, the preview page itself requires it too (see *Remote access* above).
-- **Raw HTML is rendered by default** (GitHub-like). HTML embedded in markdown runs inside the preview page, so if you preview markdown you didn't write, set `allow_raw_html = false` to have it rendered as plain text instead.
+- **Raw HTML is rendered by default** (GitHub-like), but the rendered result is sanitized in the browser by DOMPurify before it enters the DOM. Common layout HTML, images, SVG, SVG filters, MathML, and `data-*` attributes are preserved; scripts, event handlers, and dangerous URLs are removed. If DOMPurify cannot load, raw HTML fails closed and is rendered as text. Set `allow_raw_html = false` to disable raw HTML entirely.
 - **Browser libraries load from CDNs** (jsdelivr/unpkg, see *Dependencies*). Nothing from your machine is sent to them, but rendering requires internet access. Vendoring the assets locally is planned ([#27](https://github.com/selimacerbas/markdown-preview.nvim/issues/27)).
 - **`custom_css` files are inlined into the preview page** verbatim. Point it only at files you trust.
 - **Relative images are served from the previewed file's directory.** The token-gated asset route can serve *any* file at or below that directory (not just images), so on a non-loopback `host` anyone holding the tokenized URL could request other files there (`.env`, `secrets.txt`, …). Keep sensitive files out of the directory tree you preview from when binding to the network, or prefer an SSH tunnel.
