@@ -4,7 +4,7 @@ Neovim plugin for live markdown preview in the browser. Pure Lua, no npm.
 
 ## Project Structure
 
-- `lua/markdown_preview/init.lua` — main plugin logic (server lifecycle, refresh, scroll sync, mermaid pre-rendering)
+- `lua/markdown_preview/init.lua` — main plugin logic (server lifecycle, refresh, scroll sync)
 - `lua/markdown_preview/util.lua` — fs helpers, workspace resolution, asset resolution, browser open
 - `lua/markdown_preview/ts.lua` — Tree-sitter mermaid extractor + regex fallback
 - `lua/markdown_preview/lock.lua` — lock file management for takeover mode (cross-instance coordination)

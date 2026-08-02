@@ -13,7 +13,6 @@ Live **Markdown preview** for Neovim with first-class **Mermaid diagram** suppor
 - **LaTeX math** — inline `$...$` and display `$$...$$` rendered via KaTeX
 - **Syntax highlighting** for code blocks (highlight.js)
 - Automatic Dark / Light theme following the system color scheme
-- **Optional Rust-powered rendering** — use [`mermaid-rs-renderer`](https://github.com/1jehuang/mermaid-rs-renderer) for ~400x faster mermaid diagrams
 - **Zero external dependencies** — no npm, no Node.js, just Neovim + your browser
 - Powered by [`live-server.nvim`](https://github.com/selimacerbas/live-server.nvim) (pure Lua HTTP server)
 
@@ -132,8 +131,6 @@ require("markdown_preview").setup({
   -- entering another Markdown buffer. Other filetypes leave it unchanged.
   follow_current_buffer = false,
 
-  mermaid_renderer = "js",              -- "js" (browser mermaid.js) or "rust" (mmdr CLI, ~400x faster)
-
   default_theme = "auto",               -- follow the OS; "dark" or "light" forces a theme
 
   yaml_mode = "panel",                  -- front matter: "panel" (collapsible above preview), "hide", or "raw"
@@ -219,7 +216,6 @@ require("markdown_preview").setup({ instance_mode = "multi" })
 ```mermaid
 graph LR
     A[Neovim Buffer] -->|write| B[content.md]
-    A -.->|optional: mmdr| B
     B -->|fs watch| C[live-server.nvim]
     C -->|SSE| D[Browser]
     D --> E[markdown-it]
@@ -253,7 +249,6 @@ SSE event --> Browser
 Rendered preview (scroll preserved, no flicker)
 ```
 
-- **Rust renderer** (`mermaid_renderer = "rust"`): mermaid fences are pre-rendered to SVG via the `mmdr` CLI before writing to `content.md` — the browser receives ready-made SVGs with no mermaid.js overhead. Failed blocks fall back to browser-side rendering automatically.
 - **Markdown files**: The entire buffer is written to `content.md`
 - **Mermaid files** (`.mmd`, `.mermaid`): The entire buffer is wrapped in a mermaid code fence
 - **Other files**: The mermaid block under the cursor is extracted (via Tree-sitter or regex fallback) and wrapped in a code fence
@@ -269,7 +264,6 @@ Rendered preview (scroll preserved, no flicker)
 - **Neovim** 0.9+
 - **[live-server.nvim](https://github.com/selimacerbas/live-server.nvim)** — pure Lua HTTP server (no npm)
 - **Tree-sitter** with the **Markdown** parser (recommended for mermaid block extraction)
-- **[mermaid-rs-renderer](https://github.com/1jehuang/mermaid-rs-renderer)** (optional) — `cargo install mermaid-rs-renderer` for ~400x faster mermaid rendering. Set `mermaid_renderer = "rust"` in config to enable.
 
 Browser-side libraries are loaded from CDN (cached by your browser):
 - [markdown-it](https://github.com/markdown-it/markdown-it) — Markdown parser
@@ -303,6 +297,8 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 
 **Images don't show**
 - Relative paths (`pic.png`, `images/pic.png`, `../shared/pic.png`) are resolved from the directory of the file being previewed. The final real path must remain inside the current Neovim `:pwd`; run `:pwd` to inspect that boundary and `:cd /path/to/project` to change it before starting or refreshing the preview.
+- Relative image destinations use the browser's standard URL parser, so leading `./`, `.`/`..` normalization, raw Unicode mixed with escapes such as `%20`, and encoded filename characters such as `%23`, `%25`, and `%2B` are supported. URL query strings and fragments are not treated as part of the filename.
+- A literal percent sign in a Markdown URL must be written as `%25`. Malformed percent escapes and paths that cross the `:pwd` boundary are rejected instead of being guessed.
 - If the Markdown file is outside `:pwd`, access falls back to the Markdown file's own directory rather than widening to an unrelated working directory.
 - Absolute filesystem paths (`/home/me/pic.png`) are not supported; http(s) URLs load as usual.
 

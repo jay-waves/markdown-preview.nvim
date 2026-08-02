@@ -18,6 +18,18 @@ do
 	uv.fs_write(fd, "# hello\n\nbody text here.\n", 0)
 	uv.fs_close(fd)
 end
+local image_dir = vim.fs.joinpath(tmpdir, "images")
+vim.fn.mkdir(image_dir, "p")
+local encoded_name_asset = vim.fs.joinpath(image_dir, "Pasted image 20260701195255.png")
+local special_name_asset = vim.fs.joinpath(image_dir, "hash#percent%plus+.txt")
+do
+	local fd = uv.fs_open(encoded_name_asset, "w", 420)
+	uv.fs_write(fd, "encoded-name-ok", 0)
+	uv.fs_close(fd)
+	fd = uv.fs_open(special_name_asset, "w", 420)
+	uv.fs_write(fd, "special-name-ok", 0)
+	uv.fs_close(fd)
+end
 local theme_css = vim.fs.joinpath(tmpdir, "theme.css")
 local highlight_css = vim.fs.joinpath(tmpdir, "highlight.css")
 local second_mdfile = vim.fs.joinpath(tmpdir, "second.md")
@@ -100,11 +112,14 @@ ok(r.body:find("dompurify@3%.4%.12/dist/purify%.min%.js") ~= nil
 ok(r.body:find("svgFilters: true", 1, true) ~= nil
 		and r.body:find("mathMl: true", 1, true) ~= nil,
 	"DOMPurify preserves SVG filters and MathML rendering")
-ok(r.body:find("assetPath = decodeURIComponent(src)", 1, true) ~= nil,
-	"relative image URLs are decoded before asset query encoding")
+ok(r.body:find("resolveRelativeAssetPath", 1, true) ~= nil
+		and r.body:find("new URL(src, base)", 1, true) ~= nil,
+	"relative image URLs use the browser URL parser")
 ok(r.body:find("fetchAssetPrefix", 1, true) ~= nil
-		and r.body:find("assetPrefix %+ '/' %+ assetPath") ~= nil,
+		and r.body:find("__markdown_preview_asset_root__", 1, true) ~= nil,
 	"relative image URLs retain their Markdown-directory base under :pwd")
+ok(r.body:find("data%-invalid%-src") ~= nil,
+	"malformed and escaping image URLs fail closed")
 ok(r.body:find("applyInitialScroll", 1, true) ~= nil
 		and r.body:find("lastInitialScrollId", 1, true) ~= nil,
 	"initial cursor position is consumed once without continuous scroll sync")
@@ -124,6 +139,21 @@ ok(r.status == 401, "/content.md without token is 401")
 r = http_get(("http://127.0.0.1:%d/content.md?t=%s"):format(port, mp._token))
 ok(r.status == 200, "/content.md with correct token is 200")
 ok(r.body:find("hello") ~= nil, "/content.md body contains buffer text")
+
+-- Asset URL edge cases: leading ./, mixed raw Unicode/percent encoding,
+-- encoded separators, and encoded URL-special characters in real filenames.
+r = http_get(("http://127.0.0.1:%d/__live/asset?p=.%%2Fimages%%2FPasted%%20image%%2020260701195255.png&t=%s")
+	:format(port, mp._token))
+ok(r.status == 200 and r.body == "encoded-name-ok",
+	"asset route accepts ./ with encoded separators and spaces")
+
+r = http_get(("http://127.0.0.1:%d/__live/asset?p=images%%2Fhash%%23percent%%25plus%%2B.txt&t=%s")
+	:format(port, mp._token))
+ok(r.status == 200 and r.body == "special-name-ok",
+	"asset route preserves encoded #, percent, and plus filename characters")
+
+r = http_get(("http://127.0.0.1:%d/__live/asset?p=..%%2Foutside.txt&t=%s"):format(port, mp._token))
+ok(r.status == 404, "asset route rejects parent traversal outside its root")
 
 -- Entering another Markdown buffer reuses the same server and retargets it.
 vim.cmd("edit " .. second_mdfile)

@@ -824,7 +824,7 @@
             if (!sanitizerAvailable) return html;
             return window.DOMPurify.sanitize(html, {
                 // Preserve common layout HTML and images, KaTeX MathML, and
-                // pre-rendered Mermaid SVG, including SVG filter effects.
+                // raw SVG used in Markdown, including SVG filter effects.
                 USE_PROFILES: {
                     html: true,
                     svg: true,
@@ -1137,7 +1137,7 @@
         }
 
         async function renderAllMermaidBlocks() {
-            const blocks = contentEl.querySelectorAll('.mermaid-block[data-mermaid-source]:not([data-prerendered])');
+            const blocks = contentEl.querySelectorAll('.mermaid-block[data-mermaid-source]');
             for (const block of blocks) {
                 await renderMermaidBlock(block);
             }
@@ -1162,24 +1162,40 @@
             return assetPrefix !== previous;
         }
 
+        function resolveRelativeAssetPath(src, prefix) {
+            // A sentinel path preserves evidence that `..` crossed the allowed
+            // root. Resolving directly against `/` would clamp excess parents
+            // and could silently turn an invalid path into a different file.
+            const sentinel = '/__markdown_preview_asset_root__/';
+            const encodedPrefix = prefix
+                .split('/')
+                .filter(Boolean)
+                .map(segment => encodeURIComponent(segment))
+                .join('/');
+            const base = new URL(sentinel + (encodedPrefix ? encodedPrefix + '/' : ''), location.origin);
+            const resolved = new URL(src, base);
+            if (resolved.origin !== location.origin || !resolved.pathname.startsWith(sentinel)) {
+                throw new Error('relative asset path escapes :pwd');
+            }
+
+            // URL.pathname intentionally remains percent-encoded. Decode it
+            // once into the filesystem spelling; query and fragment are
+            // structural URL components and therefore never enter the path.
+            return decodeURIComponent(resolved.pathname.slice(sentinel.length));
+        }
+
         function rewriteRelativeImages(rootEl) {
             rootEl.querySelectorAll('img[src]').forEach(img => {
                 const src = img.getAttribute('src');
                 if (!src || /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|\/|#)/.test(src)) return;
-                // Markdown image destinations are URLs, so spaces are commonly
-                // already encoded as %20. Decode that URL representation before
-                // encoding it as the asset endpoint's query parameter; otherwise
-                // `%20` becomes `%2520` and the server looks for a literal `%20`
-                // in the filename.
-                let assetPath = src;
                 try {
-                    assetPath = decodeURIComponent(src);
-                } catch (_) {
-                    // Keep malformed percent sequences unchanged. The asset
-                    // route will either find that literal filename or return 404.
+                    const assetPath = resolveRelativeAssetPath(src, assetPrefix);
+                    img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(assetPath)));
+                } catch (error) {
+                    console.warn('[markdown-preview] invalid relative image URL:', src, error);
+                    img.removeAttribute('src');
+                    img.setAttribute('data-invalid-src', src);
                 }
-                const routedPath = assetPrefix ? assetPrefix + '/' + assetPath : assetPath;
-                img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(routedPath)));
             });
         }
 
