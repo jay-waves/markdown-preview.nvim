@@ -56,7 +56,7 @@ pre.hljs > code,
 
 pre:has(> code[class*="language-"]),
 pre.hljs {
-  background-color: color-mix(in srgb, var(--md-bg) 95%, var(--md-muted));
+  background-color: color-mix(in srgb, var(--md-bg) 98%, var(--md-muted));
   border: 1px solid color-mix(in srgb, var(--md-border) 78%, transparent);
 }
 

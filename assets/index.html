@@ -181,21 +181,20 @@
             border-radius: 5px;
         }
 
-        #content .code-wrap.has-language pre {
-            padding-top: 2.45rem;
-        }
-
         /* ── Language label on code blocks ───────────────────────────── */
         #content .code-wrap .code-lang {
             position: absolute;
-            top: .55rem;
+            top: 0;
             right: .75rem;
+            padding: 0 .35rem;
             font-size: .68rem;
             font-family: "Fira Code", monospace;
             color: var(--fg-muted);
+            background: var(--md-bg);
             letter-spacing: .035em;
             line-height: 1.6;
             font-weight: 500;
+            transform: translateY(-50%);
             z-index: 2;
         }
 
@@ -573,8 +572,7 @@
             const langMatch = html.match(/^<pre[^>]*\bdata-lang="([^"]*)"/);
             const language = langMatch ? langMatch[1] : '';
             const languageLabel = language ? `<span class="code-lang">${language}</span>` : '';
-            const wrapperClass = language ? 'code-wrap has-language' : 'code-wrap';
-            return `<div class="${wrapperClass}">${html}${languageLabel}</div>`;
+            return `<div class="code-wrap">${html}${languageLabel}</div>`;
         };
 
         // ── Iconify auto-detection ────────────────────────────────────

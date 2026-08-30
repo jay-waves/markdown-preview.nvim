@@ -352,10 +352,11 @@ html[data-theme="dark"] {
 }
 
 #content blockquote {
-  padding: .15rem 1rem;
+  padding: .75rem 1rem;
   color: var(--md-muted);
-  background-color: color-mix(in srgb, var(--md-bg) 96%, var(--md-accent));
-  border-left: 2px solid color-mix(in srgb, var(--md-border) 65%, var(--md-accent));
+  background-color: color-mix(in srgb, var(--md-bg) 98.5%, var(--md-accent));
+  border: 1px solid color-mix(in srgb, var(--md-border) 78%, transparent);
+  border-radius: 5px;
 }
 
 #content ul,
