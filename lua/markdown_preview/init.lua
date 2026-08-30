@@ -127,6 +127,16 @@ end
 -- Index HTML
 ---------------------------------------------------------------------------
 
+local function write_nvim_adapter(dir)
+	local src = util.resolve_asset("assets/nvim-preview.js")
+	if not src then
+		error("Could not locate assets/nvim-preview.js in runtimepath. Make sure the plugin ships it.")
+	end
+	local dst = vim.fs.joinpath(dir, "nvim-preview.js")
+	util.write_text(dst, util.read_text(src))
+	return dst
+end
+
 local function write_index(dir)
 	local dst = vim.fs.joinpath(dir, M.config.index_name)
 	local src = util.resolve_asset("assets/index.html")
@@ -151,25 +161,14 @@ local function write_index(dir)
 
 	-- gsub with function replacement: avoids the "%n is a capture reference"
 	-- escape problem if any substituted value contains '%'.
-	content = content:gsub("__BOTTOM_PADDING__", function() return tostring(M.config.bottom_padding) end)
 	content = content:gsub("__MERMAID_ELK__", function() return M.config.mermaid_elk and "true" or "false" end)
-	-- Anchor to the attribute: index.html also contains the bare placeholder
-	-- as a JS sentinel, and substituting that too breaks auth (issue #31).
-	-- Bake the token only on loopback binds: on a network bind the index is
-	-- served to any peer that can reach the port, and a baked token would
-	-- defeat the auth entirely (the browser gets it via ?t= instead).
-	content = content:gsub('data%-live%-token="__LIVE_TOKEN__"', function()
-		return 'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"'
+	content = content:gsub("<!%-%- __NVIM_ADAPTER__ %-%->", function()
+		return '<script src="https://cdn.jsdelivr.net/npm/morphdom@2/dist/morphdom-umd.min.js"></script>\n'
+			.. '<script src="nvim-preview.js"></script>'
 	end)
 	content = content:gsub("__THEME__", function() return M.config.default_theme end)
 	content = content:gsub("__ALLOW_HTML__", function()
 		return M.config.allow_raw_html ~= false and "true" or "false"
-	end)
-	content = content:gsub("__CLICK_TO_NVIM__", function()
-		return M.config.instance_mode == "multi" and M.config.click_to_nvim and M._click_server and "true" or "false"
-	end)
-	content = content:gsub("__CLICK_PORT__", function()
-		return M._click_server and tostring(M._click_server.port) or ""
 	end)
 	content = content:gsub("__YAML_MODE__", function()
 		local m = M.config.yaml_mode
@@ -177,6 +176,19 @@ local function write_index(dir)
 		if m ~= "code" and m ~= "hide" and m ~= "raw" then m = "code" end
 		return m
 	end)
+
+	-- Host-only configuration is added to generated preview pages; the source
+	-- index remains a standalone renderer with no Neovim protocol attributes.
+	local host_attrs = table.concat({
+		'data-bottom-padding="' .. tostring(M.config.bottom_padding) .. '"',
+		'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"',
+		'data-click-to-nvim="' ..
+			(M.config.instance_mode == "multi" and M.config.click_to_nvim and M._click_server and "true" or "false") .. '"',
+		'data-click-port="' .. (M._click_server and tostring(M._click_server.port) or "") .. '"',
+	}, " ")
+	content = content:gsub('<html lang="en"', function()
+		return '<html lang="en" ' .. host_attrs
+	end, 1)
 
 	-- Inline custom CSS after the bundled styles so user rules win the cascade.
 	-- A list keeps base theme and syntax highlighting files independent while
@@ -212,6 +224,9 @@ local function write_index(dir)
 end
 
 local function write_index_if_needed(dir)
+	-- The host adapter is deliberately separate from the reusable renderer
+	-- document, but must live beside the generated index for static serving.
+	write_nvim_adapter(dir)
 	if M.config.overwrite_index_on_start then
 		return write_index(dir)
 	end

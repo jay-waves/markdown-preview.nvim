@@ -338,7 +338,8 @@ markdown-preview.nvim/
 │  ├─ lock.lua                       -- lock file management (takeover mode coordination)
 │  └─ remote.lua                     -- HTTP event injection (secondary scroll sync)
 └─ assets/
-   └─ index.html                     -- browser preview app
+   ├─ index.html                     -- standalone Markdown renderer and browser UI
+   └─ nvim-preview.js                -- Neovim live-preview adapter
 ```
 
 ---

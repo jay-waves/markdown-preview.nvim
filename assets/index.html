@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="__THEME__" data-theme-mode="__THEME__" data-bottom-padding="__BOTTOM_PADDING__" data-mermaid-elk="__MERMAID_ELK__" data-live-token="__LIVE_TOKEN__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__" data-click-to-nvim="__CLICK_TO_NVIM__" data-click-port="__CLICK_PORT__">
+<html lang="en" data-theme="__THEME__" data-theme-mode="__THEME__" data-mermaid-elk="__MERMAID_ELK__" data-yaml-mode="__YAML_MODE__" data-allow-html="__ALLOW_HTML__">
 
 <head>
     <meta charset="utf-8" />
@@ -169,46 +169,34 @@
             }
         }
 
-        /* Non-scrolling wrapper around fenced code: keeps the copy button
-           pinned while the <pre> scrolls horizontally */
+        /* Non-scrolling wrapper around fenced code: keeps the language label
+           pinned while the <pre> scrolls horizontally. */
         #content .code-wrap {
             position: relative;
-            margin: 0 0 1em;
+            margin: 1.25rem 0;
         }
 
         #content .code-wrap pre {
             margin: 0;
+            border-radius: 5px;
         }
 
-        /* ── Language/copy button on code blocks ─────────────────────── */
-        #content .code-wrap .copy-btn {
+        #content .code-wrap.has-language pre {
+            padding-top: 2.45rem;
+        }
+
+        /* ── Language label on code blocks ───────────────────────────── */
+        #content .code-wrap .code-lang {
             position: absolute;
-            top: 0;
-            right: 0;
-            padding: .2em .6em;
+            top: .55rem;
+            right: .75rem;
             font-size: .68rem;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: var(--badge-fg);
-            background: var(--badge-bg);
-            border: 0;
-            border-bottom-left-radius: 6px;
-            border-top-right-radius: 7px;
-            text-transform: uppercase;
-            letter-spacing: .5px;
+            font-family: "Fira Code", monospace;
+            color: var(--fg-muted);
+            letter-spacing: .035em;
+            line-height: 1.6;
             font-weight: 500;
-            line-height: 1.4;
-            cursor: pointer;
-            transition: color .15s, background .15s;
             z-index: 2;
-        }
-
-        #content .code-wrap .copy-btn:hover {
-            color: var(--fg);
-            background: rgba(127, 127, 127, .15);
-        }
-
-        #content .code-wrap .copy-btn.copied {
-            color: #3fb950;
         }
 
         /* ── Mermaid diagrams ──────────────────────────────────────────── */
@@ -381,9 +369,8 @@
         <div id="overlay-panzoom"><div id="overlay-panzoom-inner"></div></div>
     </dialog>
 
-    <!-- CDN deps: markdown-it, morphdom, highlight.js, emoji, footnote, anchor -->
+    <!-- CDN deps: markdown-it, highlight.js, emoji, footnote, anchor -->
     <script src="https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/morphdom@2/dist/morphdom-umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-emoji@3.0.0/dist/markdown-it-emoji.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js"></script>
@@ -398,8 +385,6 @@
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         import markdownItGithubAlerts from 'https://unpkg.com/markdown-it-github-alerts@1.0.1/dist/index.mjs';
 
-        const BOTTOM_PADDING = parseFloat(document.documentElement.dataset.bottomPadding) || 0.5;
-
         // ── DOM refs ──────────────────────────────────────────────────
         const $ = (id) => document.getElementById(id);
         const contentEl = $('content');
@@ -413,53 +398,11 @@
         const ovClose = $('ovClose');
 
         // ── State ─────────────────────────────────────────────────────
-        let lastContent = null;
         const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const followsSystemTheme = document.documentElement.dataset.themeMode === 'auto';
         let currentTheme = document.documentElement.dataset.theme || 'dark';
         let mermaidIdCounter = 0;
         const loadedPacks = new Set();
-
-        // Live-reload auth token. Either substituted into the document by
-        // markdown-preview.nvim at file-write time, or passed via ?t=<token>
-        // in the URL on first load (then stashed in sessionStorage so it
-        // survives refreshes). Empty string when the server has no auth.
-        const LIVE_TOKEN = (() => {
-            const fromAttr = document.documentElement.dataset.liveToken || '';
-            // Split literal: a whole '__LIVE_TOKEN__' here would itself be
-            // rewritten by write_index's substitution, turning this guard
-            // into token !== token and breaking auth on tab reuse (issue #31).
-            if (fromAttr && fromAttr !== '__LIVE' + '_TOKEN__') {
-                try { sessionStorage.setItem('mdp-token', fromAttr); } catch (_) {}
-                return fromAttr;
-            }
-            const fromUrl = new URLSearchParams(location.search).get('t');
-            if (fromUrl) {
-                try { sessionStorage.setItem('mdp-token', fromUrl); } catch (_) {}
-                return fromUrl;
-            }
-            try { return sessionStorage.getItem('mdp-token') || ''; } catch (_) { return ''; }
-        })();
-        const withToken = (url) => {
-            if (!LIVE_TOKEN) return url;
-            return url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + encodeURIComponent(LIVE_TOKEN);
-        };
-        const CLICK_TO_NVIM = document.documentElement.dataset.clickToNvim === 'true';
-        const CLICK_PORT = document.documentElement.dataset.clickPort || '';
-
-        // Scroll sync state
-        let scrollSyncPaused = false;
-        let scrollSyncPauseTimer = null;
-        let lastScrollData = null;
-
-        // Pause scroll sync briefly when user scrolls the browser manually
-        function pauseScrollSync() {
-            scrollSyncPaused = true;
-            clearTimeout(scrollSyncPauseTimer);
-            scrollSyncPauseTimer = setTimeout(() => { scrollSyncPaused = false; }, 3000);
-        }
-        window.addEventListener('wheel', pauseScrollSync, { passive: true });
-        window.addEventListener('touchmove', pauseScrollSync, { passive: true });
 
         // Overlay state
         let ovSvgSource = '';
@@ -623,14 +566,15 @@
                 html = self.renderToken(tokens, idx, options);
             }
             if (lineAttr) html = html.replace(/^<pre\b/, `<pre${lineAttr}`);
-            // Wrap in a non-scrolling container so the language/copy button
+            // Wrap in a non-scrolling container so the language label
             // stays pinned while the <pre> scrolls horizontally.
             // Emitted here rather than in a DOM pass so morphdom's virtual
             // tree matches the live tree and code blocks patch in place.
             const langMatch = html.match(/^<pre[^>]*\bdata-lang="([^"]*)"/);
-            const copyLabel = langMatch ? langMatch[1] : 'Copy';
-            return `<div class="code-wrap">${html}` +
-                `<button class="copy-btn" type="button" title="Copy code" data-copy-label="${copyLabel}">${copyLabel}</button></div>`;
+            const language = langMatch ? langMatch[1] : '';
+            const languageLabel = language ? `<span class="code-lang">${language}</span>` : '';
+            const wrapperClass = language ? 'code-wrap has-language' : 'code-wrap';
+            return `<div class="${wrapperClass}">${html}${languageLabel}</div>`;
         };
 
         // ── Iconify auto-detection ────────────────────────────────────
@@ -707,227 +651,6 @@
             }
         }
 
-        // ── Copy button on code blocks ────────────────────────────────
-        // Relative image paths resolve against the served workspace, which
-        // only contains the rendered content — rewrite them to the token-
-        // gated asset route, which resolves against the source file's dir.
-        // Runs on the detached render tree BEFORE morphdom applies it, so
-        // raw-HTML <img> tags never fire an unrewritten (404) request.
-        let assetPrefix = '';
-
-        async function fetchAssetPrefix() {
-            const previous = assetPrefix;
-            try {
-                const resp = await fetch(withToken('/asset_prefix'), { cache: 'no-store' });
-                assetPrefix = resp.ok ? (await resp.text()).trim().replace(/\\/g, '/') : '';
-            } catch (_) {
-                assetPrefix = '';
-            }
-            return assetPrefix !== previous;
-        }
-
-        function resolveRelativeAssetPath(src, prefix) {
-            // A sentinel path preserves evidence that `..` crossed the allowed
-            // root. Resolving directly against `/` would clamp excess parents
-            // and could silently turn an invalid path into a different file.
-            const sentinel = '/__markdown_preview_asset_root__/';
-            const encodedPrefix = prefix
-                .split('/')
-                .filter(Boolean)
-                .map(segment => encodeURIComponent(segment))
-                .join('/');
-            const base = new URL(sentinel + (encodedPrefix ? encodedPrefix + '/' : ''), location.origin);
-            const resolved = new URL(src, base);
-            if (resolved.origin !== location.origin || !resolved.pathname.startsWith(sentinel)) {
-                throw new Error('relative asset path escapes :pwd');
-            }
-
-            // URL.pathname intentionally remains percent-encoded. Decode it
-            // once into the filesystem spelling; query and fragment are
-            // structural URL components and therefore never enter the path.
-            return decodeURIComponent(resolved.pathname.slice(sentinel.length));
-        }
-
-        function rewriteRelativeImages(rootEl) {
-            rootEl.querySelectorAll('img[src]').forEach(img => {
-                const src = img.getAttribute('src');
-                if (!src || /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|\/\/|\/|#)/.test(src)) return;
-                try {
-                    const assetPath = resolveRelativeAssetPath(src, assetPrefix);
-                    img.setAttribute('src', withToken('/__live/asset?p=' + encodeURIComponent(assetPath)));
-                } catch (error) {
-                    console.warn('[markdown-preview] invalid relative image URL:', src, error);
-                    img.removeAttribute('src');
-                    img.setAttribute('data-invalid-src', src);
-                }
-            });
-        }
-
-        // ── Content sync ──────────────────────────────────────────────
-        async function fetchContent() {
-            try {
-                const resp = await fetch(withToken('content.md?ts=' + Date.now()), { cache: 'no-store' });
-                if (!resp.ok) {
-                    console.warn('[markdown-preview] content.md fetch failed:', resp.status);
-                    if (resp.status === 401) {
-                        // Stale token (server restarted since this tab loaded).
-                        // Evict it so the next load bootstraps fresh.
-                        try { sessionStorage.removeItem('mdp-token'); } catch (_) {}
-                    }
-                    return null;
-                }
-                return (await resp.text()).replace(/\r\n?/g, '\n');
-            } catch (e) {
-                console.warn('[markdown-preview] content.md fetch error:', e);
-                return null;
-            }
-        }
-
-        async function sync(initial = false) {
-            const text = await fetchContent();
-            if (text == null) {
-                return;
-            }
-            const assetPrefixChanged = await fetchAssetPrefix();
-            if (!initial && text === lastContent && !assetPrefixChanged) return;
-            lastContent = text;
-
-            try {
-                const html = sanitizeRenderedHtml(md.render(text));
-
-                showContent();
-
-                if (window.morphdom) {
-                    const wrapper = document.createElement('div');
-                    wrapper.id = 'content';
-                    wrapper.innerHTML = html;
-                    rewriteRelativeImages(wrapper);
-
-                    window.morphdom(contentEl, wrapper, {
-                        childrenOnly: false,
-                        getNodeKey: function (node) {
-                            if (node.nodeType === 1) {
-                                if (node.getAttribute && node.getAttribute('data-graph') === 'mermaid') {
-                                    return node.id;
-                                }
-                                return node.id || null;
-                            }
-                            return null;
-                        },
-                        onBeforeElUpdated: function (fromEl, toEl) {
-                            if (fromEl.classList && fromEl.classList.contains('mermaid-rendered') &&
-                                fromEl.dataset.mermaidSource === toEl.dataset.mermaidSource) {
-                                return false;
-                            }
-                            if (fromEl.tagName === 'DETAILS' && fromEl.hasAttribute('open')) {
-                                toEl.setAttribute('open', '');
-                            }
-                            return true;
-                        },
-                    });
-                } else {
-                    contentEl.innerHTML = html;
-                    rewriteRelativeImages(contentEl);
-                }
-                applyBottomPadding();
-
-                await renderAllMermaidBlocks();
-                await applyInitialScroll();
-
-            } catch (e) {
-                console.error('[markdown-preview] render error:', e);
-                contentEl.innerHTML = '<pre style="white-space:pre-wrap;padding:1rem">' +
-                    text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>';
-            }
-        }
-
-        // ── Scroll sync (line-based interpolation) ─────────────────────
-        function getElementOffset(el) {
-            let current = el;
-            let top = 0;
-            while (top === 0 && current) {
-                top = current.getBoundingClientRect().top;
-                current = current.parentElement;
-            }
-            return top + window.scrollY;
-        }
-
-        function scrollToSourceLine(line, total) {
-            const elements = contentEl.querySelectorAll('[data-source-line]');
-            if (!elements.length) return;
-
-            // Edge: first or last line
-            if (line <= 0) { window.scrollTo({ top: 0 }); return; }
-            if (line >= total - 1) { window.scrollTo({ top: document.documentElement.scrollHeight }); return; }
-
-            // Find element at/before cursor line and the one after
-            let prev = null, next = null;
-            for (const el of elements) {
-                const elLine = Number(el.dataset.sourceLine);
-                if (elLine <= line) {
-                    prev = { el, line: elLine };
-                } else {
-                    next = { el, line: elLine };
-                    break;
-                }
-            }
-
-            if (!prev) { window.scrollTo({ top: 0 }); return; }
-
-            const prevTop = getElementOffset(prev.el);
-            let offsetTop;
-
-            if (next) {
-                const nextTop = getElementOffset(next.el);
-                const ratio = (line - prev.line) / (next.line - prev.line);
-                offsetTop = prevTop + (nextTop - prevTop) * ratio;
-            } else {
-                // Last element — extrapolate using its height
-                const h = prev.el.getBoundingClientRect().height;
-                const linesLeft = Math.max(1, total - prev.line);
-                offsetTop = prevTop + (line - prev.line) * (h / linesLeft);
-            }
-
-            // Center the target line in the viewport
-            window.scrollTo({ top: Math.max(0, offsetTop - window.innerHeight / 2) });
-        }
-
-        let lastInitialScrollId = null;
-
-        async function applyInitialScroll() {
-            try {
-                const resp = await fetch(withToken('/initial_scroll'), { cache: 'no-store' });
-                if (!resp.ok) return;
-                const text = (await resp.text()).trim();
-                if (!text) return;
-                const data = JSON.parse(text);
-                if (!data.id || data.id === lastInitialScrollId || data.line == null) return;
-                lastInitialScrollId = data.id;
-                scrollToSourceLine(data.line, data.total || 1);
-            } catch (_) {}
-        }
-
-        // ── SSE (Server-Sent Events from live-server.nvim) ────────────
-        function connectSSE() {
-            const evtSource = new EventSource(withToken('/__live/events'));
-            evtSource.addEventListener('reload', async () => {
-                await sync(false);
-            });
-            evtSource.addEventListener('scroll', (event) => {
-                if (scrollSyncPaused) return;
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.line == null) return;
-                    lastScrollData = data;
-                    scrollToSourceLine(data.line, data.total || 1);
-                } catch (_) {}
-            });
-            evtSource.addEventListener('open', () => {
-                console.log('[markdown-preview] SSE connected');
-            });
-            return evtSource;
-        }
-
         // ── Expand overlay (fullscreen diagram zoom/pan) ──────────────
         function openOverlay(svgHtml) {
             ovSvgSource = svgHtml;
@@ -992,23 +715,6 @@
 
         // ── Delegated content actions ─────────────────────────────────
         contentEl.addEventListener('click', async (e) => {
-            const copyBtn = e.target.closest('.copy-btn');
-            if (copyBtn) {
-                e.stopPropagation();
-                const code = copyBtn.closest('.code-wrap')?.querySelector('code');
-                if (!code) return;
-                try {
-                    await navigator.clipboard.writeText(code.textContent);
-                    copyBtn.textContent = 'Copied';
-                    copyBtn.classList.add('copied');
-                    setTimeout(() => {
-                        copyBtn.textContent = copyBtn.dataset.copyLabel || 'Copy';
-                        copyBtn.classList.remove('copied');
-                    }, 1500);
-                } catch (_) {}
-                return;
-            }
-
             const expandBtn = e.target.closest('[data-expand]');
             if (expandBtn) {
                 const blockId = expandBtn.dataset.expand;
@@ -1020,32 +726,29 @@
                 if (svg) openOverlay(svg);
                 return;
             }
-
-            if (!CLICK_TO_NVIM || !CLICK_PORT) return;
-            if (e.target.closest('a, button, input, select, textarea, summary')) return;
-            const block = e.target.closest('[data-source-line]');
-            if (!block) return;
-            const line = Number(block.dataset.sourceLine);
-            if (!Number.isInteger(line) || line < 0) return;
-            const url = `${location.protocol}//${location.hostname}:${CLICK_PORT}` +
-                `/__markdown_preview/click?line=${line}&t=${encodeURIComponent(LIVE_TOKEN)}`;
-            fetch(url, { mode: 'no-cors', cache: 'no-store', keepalive: true }).catch(() => {});
         });
 
-        // Re-apply scroll when layout shifts (images loading, etc.)
-        new ResizeObserver(() => {
-            if (lastScrollData && !scrollSyncPaused) {
-                scrollToSourceLine(lastScrollData.line, lastScrollData.total || 1);
-            }
-        }).observe(contentEl);
+        // ── Public renderer API ───────────────────────────────────────
+        const core = {
+            contentElement: contentEl,
+            renderToHtml(markdown) {
+                return sanitizeRenderedHtml(md.render(markdown));
+            },
+            async renderMermaid(force = false) {
+                await renderAllMermaidBlocks(force);
+            },
+            async render(markdown) {
+                contentEl.innerHTML = this.renderToHtml(markdown);
+                showContent();
+                await this.renderMermaid();
+                return contentEl;
+            },
+            setTheme: applyTheme,
+            showContent,
+        };
 
-        // ── Bottom padding ────────────────────────────────────────────
-        function applyBottomPadding() {
-            contentEl.style.paddingBottom = `${(1 - BOTTOM_PADDING) * window.innerHeight}px`;
-        }
-        window.addEventListener('resize', applyBottomPadding);
-
-        // ── Boot ──────────────────────────────────────────────────────
+        // Initialize renderer-only features. Host integrations, including the
+        // Neovim live-preview protocol, attach through the ready event below.
         (async function boot() {
             try {
                 if (document.documentElement.dataset.mermaidElk === 'true') {
@@ -1053,15 +756,17 @@
                     mermaid.registerLayoutLoaders(elkLayouts.default || elkLayouts);
                 }
                 applyTheme(currentTheme);
-                await sync(true);
             } catch (e) {
                 console.error('[markdown-preview] boot error:', e);
                 showContent();
                 contentEl.innerHTML = '<p style="color:var(--err-fg)">Error: ' + (e.message || e) + '</p>';
+                return;
             }
-            connectSSE();
+            window.markdownPreviewCore = core;
+            window.dispatchEvent(new CustomEvent('markdown-preview-ready', { detail: core }));
         })();
     </script>
+    <!-- __NVIM_ADAPTER__ -->
 
     <noscript>
         <p style="padding:1rem;color:#fff;background:#7f1d1d">

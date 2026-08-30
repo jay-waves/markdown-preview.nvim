@@ -56,8 +56,8 @@ pre.hljs > code,
 
 pre:has(> code[class*="language-"]),
 pre.hljs {
-  background-color: var(--md-pre-bg, #f3f4f6);
-  border: 1px solid var(--md-border, #d1d9e0);
+  background-color: color-mix(in srgb, var(--md-bg) 95%, var(--md-muted));
+  border: 1px solid color-mix(in srgb, var(--md-border) 78%, transparent);
 }
 
 code[class*="language-"].code-active-line {

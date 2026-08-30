@@ -352,11 +352,10 @@ html[data-theme="dark"] {
 }
 
 #content blockquote {
-  margin: 0;
-  padding: 0 1em;
+  padding: .15rem 1rem;
   color: var(--md-muted);
-  background-color: var(--md-quote-bg);
-  border-left: .25em solid var(--md-border);
+  background-color: color-mix(in srgb, var(--md-bg) 96%, var(--md-accent));
+  border-left: 2px solid color-mix(in srgb, var(--md-border) 65%, var(--md-accent));
 }
 
 #content ul,
@@ -428,6 +427,12 @@ html[data-theme="dark"] {
 #content details {
   margin-top: 0;
   margin-bottom: 1rem;
+}
+
+/* Quotations are document-level blocks rather than body paragraphs. Give
+ * them the same independent vertical rhythm as fenced code. */
+#content blockquote {
+  margin-block: 1.25rem;
 }
 
 #content blockquote>:first-child {

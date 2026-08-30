@@ -92,12 +92,19 @@ ok(r.status == 200, "/ (index) is 200 without token")
 ok(r.body:find("data%-live%-token=\"" .. mp._token .. "\"") ~= nil,
 	"index.html has data-live-token attribute set to current token")
 ok(r.body:find("__MARKDOWN_THEME_CSS__", 1, true) == nil
-		and r.body:find("__HIGHLIGHT_THEME_CSS__", 1, true) == nil,
+		and r.body:find("__HIGHLIGHT_THEME_CSS__", 1, true) == nil
+		and r.body:find("__NVIM_ADAPTER__", 1, true) == nil,
 	"index template placeholders are resolved")
+ok(r.body:find('<script src="nvim%-preview%.js"></script>') ~= nil,
+	"generated index loads the external Neovim adapter")
 local theme_pos = r.body:find("custom%-theme%-marker")
 local highlight_pos = r.body:find("custom%-highlight%-marker")
 ok(theme_pos ~= nil and highlight_pos ~= nil and theme_pos < highlight_pos,
 	"custom_css files are injected in configured order")
+
+r = http_get(("http://127.0.0.1:%d/nvim-preview.js"):format(port))
+ok(r.status == 200 and r.body:find("function connectSSE", 1, true) ~= nil,
+	"Neovim adapter is copied beside and served with index.html")
 
 -- content.md is gated
 r = http_get(("http://127.0.0.1:%d/content.md"):format(port))
