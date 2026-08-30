@@ -12,7 +12,9 @@ local uv = vim.loop
 -- ─── Setup: open a markdown buffer ──────────────────────────────────────────
 local tmpdir = vim.fn.tempname()
 vim.fn.mkdir(tmpdir, "p")
-local mdfile = vim.fs.joinpath(tmpdir, "test.md")
+local docs_dir = vim.fs.joinpath(tmpdir, "docs")
+vim.fn.mkdir(docs_dir, "p")
+local mdfile = vim.fs.joinpath(docs_dir, "test.md")
 do
 	local fd = uv.fs_open(mdfile, "w", 420)
 	uv.fs_write(fd, "# hello\n\nbody text here.\n", 0)
@@ -47,6 +49,10 @@ end
 
 vim.cmd("edit " .. mdfile)
 vim.bo.filetype = "markdown"
+-- Start with a window-local cwd at the Markdown file. Later widening it to
+-- tmpdir exercises :MarkdownPreviewRefresh after :lcd/:cd on Windows, where
+-- vim.fs.normalize() returns '/' even though package.config uses '\\'.
+vim.cmd.lcd(docs_dir)
 
 -- ─── Configure: avoid opening a real browser, force multi mode for isolation
 local mp = require("markdown_preview")
@@ -113,6 +119,15 @@ ok(r.status == 401, "/content.md without token is 401")
 r = http_get(("http://127.0.0.1:%d/content.md?t=%s"):format(port, mp._token))
 ok(r.status == 200, "/content.md with correct token is 200")
 ok(r.body:find("hello") ~= nil, "/content.md body contains buffer text")
+
+-- Changing :pwd must refresh both the server asset root and the browser-side
+-- source-directory prefix even when the Markdown text itself is unchanged.
+vim.cmd.lcd(tmpdir)
+local cwd_refreshed = vim.wait(2000, function()
+	r = http_get(("http://127.0.0.1:%d/asset_prefix?t=%s"):format(port, mp._token))
+	return r.status == 200 and r.body == "docs"
+end, 50)
+ok(cwd_refreshed, "DirChanged automatically updates the asset prefix")
 
 -- Asset URL edge cases: leading ./, mixed raw Unicode/percent encoding,
 -- encoded separators, and encoded URL-special characters in real filenames.

@@ -319,9 +319,12 @@ local function asset_context(bufnr)
 	local root_cmp = package.config:sub(1, 1) == "\\" and cwd:lower() or cwd
 	local src_cmp = package.config:sub(1, 1) == "\\" and src_dir:lower() or src_dir
 	if src_cmp == root_cmp then return cwd, "" end
+	-- vim.fs.normalize() uses forward slashes on Windows too. Appending
+	-- package.config's "\\" here makes e.g. E:/project\\ fail to match
+	-- E:/project/docs, so a refreshed :pwd is silently ignored on Windows.
 	local root_with_sep = root_cmp
-	if not root_with_sep:match("[/\\]$") then
-		root_with_sep = root_with_sep .. package.config:sub(1, 1)
+	if not root_with_sep:match("/$") then
+		root_with_sep = root_with_sep .. "/"
 	end
 	if src_cmp:sub(1, #root_with_sep) == root_with_sep then
 		local prefix = src_dir:sub(#cwd + 1):gsub("^[/\\]+", ""):gsub("\\", "/")
@@ -450,6 +453,20 @@ local function set_autocmds_for_buffer(bufnr)
 				desc = "Markdown Preview auto-refresh (debounced)",
 			})
 		end
+
+		-- :cd, :lcd, and :tcd can widen or narrow the root used for relative
+		-- assets without changing the Markdown buffer. DirChanged is not a
+		-- buffer-local event, so refresh the active preview buffer explicitly.
+		vim.api.nvim_create_autocmd("DirChanged", {
+			group = M._augroup,
+			callback = function()
+				local active = M._active_bufnr
+				if active and vim.api.nvim_buf_is_valid(active) then
+					debounced_refresh(active)
+				end
+			end,
+			desc = "Markdown Preview: refresh relative assets after cwd changes",
+		})
 	end
 
 	if M.config.scroll_sync then
