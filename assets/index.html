@@ -199,6 +199,96 @@
         }
 
         /* ── Mermaid diagrams ──────────────────────────────────────────── */
+        /* Collapsible heading sections */
+        #content section.heading-section {
+            margin: 0;
+        }
+
+        #content section.heading-section.is-collapsed > .heading-content {
+            display: none;
+        }
+
+        #content .heading-collapsed-indicator {
+            display: none;
+            position: absolute;
+            left: 0;
+            bottom: .08rem;
+            color: var(--fg-muted);
+            font-family: var(--md-font-sans);
+            font-size: .72rem;
+            font-weight: 400;
+            line-height: 1;
+            opacity: .45;
+        }
+
+        #content section.heading-section.is-collapsed.has-heading-content
+            > .heading-summary > .heading-collapsed-indicator {
+            display: block;
+        }
+
+        #content .heading-summary {
+            display: block;
+            position: relative;
+            padding-block: 1px;
+            margin-block: -1px;
+            list-style: none;
+            cursor: pointer;
+        }
+
+        #content .heading-summary > :is(h1, h2, h3, h4, h5, h6)::before {
+            content: '';
+            position: absolute;
+            left: -.9rem;
+            top: 50%;
+            width: .32rem;
+            height: .32rem;
+            border-right: 1.25px solid var(--fg-muted);
+            border-bottom: 1.25px solid var(--fg-muted);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-50%) rotate(-45deg);
+            transition: transform .16s ease, border-color .16s ease, opacity .16s ease;
+        }
+
+        #content section.heading-section:not(.is-collapsed) > .heading-summary
+            > :is(h1, h2, h3, h4, h5, h6)::before {
+            transform: translateY(-50%) rotate(45deg);
+        }
+
+        #content .heading-summary:hover > :is(h1, h2, h3, h4, h5, h6)::before,
+        #content .heading-summary:focus-visible > :is(h1, h2, h3, h4, h5, h6)::before {
+            border-color: var(--fg);
+            opacity: .55;
+        }
+
+        #content section.heading-section.is-collapsed
+            section.heading-section > .heading-summary {
+            pointer-events: none;
+            cursor: default;
+        }
+
+        #content section.heading-section.is-collapsed
+            section.heading-section > .heading-summary
+            > :is(h1, h2, h3, h4, h5, h6)::before {
+            opacity: 0;
+        }
+
+        #content .heading-summary > :is(h1, h2, h3, h4, h5, h6) {
+            display: block;
+            position: relative;
+        }
+
+        #content .heading-summary > :is(h1, h2) {
+            padding-bottom: .3em;
+            border-bottom: 1px solid var(--md-border-muted);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #content .heading-summary > :is(h1, h2, h3, h4, h5, h6)::before {
+                transition: none;
+            }
+        }
+
         .mermaid-block {
             position: relative;
             margin: 1em 0;

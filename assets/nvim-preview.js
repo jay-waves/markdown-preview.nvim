@@ -82,6 +82,101 @@
         });
     }
 
+    function captureHeadingStates(rootEl) {
+        const states = new Map();
+        rootEl.querySelectorAll('section.heading-section[data-heading-key]').forEach(section => {
+            states.set(section.dataset.headingKey, section.classList.contains('is-collapsed'));
+        });
+        return states;
+    }
+
+    function updateHeadingAvailability(rootEl) {
+        rootEl.querySelectorAll('section.heading-section').forEach(section => {
+            const summary = section.querySelector(':scope > .heading-summary');
+            if (!summary) return;
+
+            const disabled = Boolean(
+                section.parentElement?.closest('section.heading-section.is-collapsed'),
+            );
+            summary.tabIndex = disabled ? -1 : 0;
+            summary.setAttribute(
+                'aria-expanded',
+                String(!section.classList.contains('is-collapsed')),
+            );
+            if (disabled) summary.setAttribute('aria-disabled', 'true');
+            else summary.removeAttribute('aria-disabled');
+        });
+    }
+
+    function makeHeadingsCollapsible(rootEl, states = new Map()) {
+        const headings = Array.from(rootEl.children).filter(element =>
+            /^H[1-6]$/.test(element.tagName),
+        );
+        const occurrences = new Map();
+        const keys = new Map();
+
+        headings.forEach((heading, index) => {
+            const identity = heading.id || heading.textContent.trim()
+                || heading.dataset.sourceLine || String(index);
+            const base = `${heading.tagName}:${identity}`;
+            const occurrence = occurrences.get(base) || 0;
+            occurrences.set(base, occurrence + 1);
+            keys.set(heading, `${base}:${occurrence}`);
+        });
+
+        // Build from the bottom up so nested heading levels retain their sections.
+        for (let index = headings.length - 1; index >= 0; index -= 1) {
+            const heading = headings[index];
+            const level = Number(heading.tagName.slice(1));
+            const key = keys.get(heading);
+            const section = document.createElement('section');
+            const summary = document.createElement('div');
+            const content = document.createElement('div');
+            const indicator = document.createElement('span');
+
+            section.className = 'heading-section';
+            section.dataset.headingLevel = String(level);
+            section.dataset.headingKey = key;
+            section.classList.toggle('is-collapsed', states.get(key) === true);
+            summary.className = 'heading-summary';
+            summary.setAttribute('role', 'button');
+            content.className = 'heading-content';
+            indicator.className = 'heading-collapsed-indicator';
+            indicator.setAttribute('aria-hidden', 'true');
+            indicator.textContent = '…';
+
+            rootEl.insertBefore(section, heading);
+            summary.append(heading, indicator);
+            section.append(summary, content);
+
+            while (section.nextSibling) {
+                const sibling = section.nextSibling;
+                const siblingLevel = sibling instanceof HTMLElement
+                    && sibling.matches('section.heading-section')
+                    ? Number(sibling.dataset.headingLevel)
+                    : Infinity;
+
+                if (siblingLevel <= level) break;
+                if (siblingLevel < Infinity) section.append(sibling);
+                else content.append(sibling);
+            }
+
+            const hasContent = Array.from(content.childNodes).some(node =>
+                node.nodeType === Node.ELEMENT_NODE || (node.textContent || '').trim(),
+            );
+            section.classList.toggle('has-heading-content', hasContent);
+        }
+
+        updateHeadingAvailability(rootEl);
+    }
+
+    function toggleHeadingSection(section) {
+        const collapsed = !section.classList.contains('is-collapsed');
+        const subtree = [section, ...section.querySelectorAll('section.heading-section')];
+        subtree.forEach(item => item.classList.toggle('is-collapsed', collapsed));
+        updateHeadingAvailability(section.closest('#content'));
+    }
+
     async function fetchContent() {
         try {
             const resp = await fetch(withToken('content.md?ts=' + Date.now()), { cache: 'no-store' });
@@ -107,6 +202,7 @@
         lastContent = text;
 
         try {
+            const headingStates = captureHeadingStates(core.contentElement);
             const html = core.renderToHtml(text);
             core.showContent();
 
@@ -115,11 +211,15 @@
                 wrapper.id = 'content';
                 wrapper.innerHTML = html;
                 rewriteRelativeImages(wrapper);
+                makeHeadingsCollapsible(wrapper, headingStates);
 
                 window.morphdom(core.contentElement, wrapper, {
                     childrenOnly: false,
                     getNodeKey(node) {
                         if (node.nodeType === 1) {
+                            if (node.matches?.('section.heading-section')) {
+                                return `heading:${node.dataset.headingKey}`;
+                            }
                             if (node.getAttribute && node.getAttribute('data-graph') === 'mermaid') {
                                 return node.id;
                             }
@@ -141,6 +241,7 @@
             } else {
                 core.contentElement.innerHTML = html;
                 rewriteRelativeImages(core.contentElement);
+                makeHeadingsCollapsible(core.contentElement, headingStates);
             }
 
             applyBottomPadding(core.contentElement);
@@ -238,8 +339,30 @@
         window.addEventListener('resize', () => applyBottomPadding(core.contentElement));
 
         core.contentElement.addEventListener('click', event => {
+            const summary = event.target.closest('.heading-summary');
+            if (summary && summary.getAttribute('aria-disabled') !== 'true') {
+                const section = summary.closest('section.heading-section');
+                if (section) {
+                    pauseScrollSync();
+                    toggleHeadingSection(section);
+                }
+            }
+        });
+
+        core.contentElement.addEventListener('keydown', event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const summary = event.target.closest('.heading-summary');
+            if (!summary || summary.getAttribute('aria-disabled') === 'true') return;
+            const section = summary.closest('section.heading-section');
+            if (!section) return;
+            event.preventDefault();
+            pauseScrollSync();
+            toggleHeadingSection(section);
+        });
+
+        core.contentElement.addEventListener('click', event => {
             if (!CLICK_TO_NVIM || !CLICK_PORT) return;
-            if (event.target.closest('a, button, input, select, textarea, summary')) return;
+            if (event.target.closest('a, button, input, select, textarea, summary, .heading-summary')) return;
             const block = event.target.closest('[data-source-line]');
             if (!block) return;
             const line = Number(block.dataset.sourceLine);
