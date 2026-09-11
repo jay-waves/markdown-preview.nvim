@@ -102,7 +102,6 @@ require("markdown_preview").setup({
   port = 0,                             -- 0 = auto (8421 for takeover, OS-assigned for multi)
   host = "127.0.0.1",                   -- bind address; "0.0.0.0" for network access (see Remote access)
   open_browser = true,                  -- auto-open browser on start
-  close_on_stop = true,                 -- request tab closure on stop/editor exit
 
   -- nil = system default browser
   -- string = browser name ("Firefox") or binary ("google-chrome")
@@ -176,8 +175,7 @@ require("markdown_preview").setup({
 - **`on_stop()`** — called after the server is stopped and all cleanup is done.
 
 `:MarkdownPreviewStop` and normal Neovim exit send a close event to tabs connected
-to this instance before stopping its server. Set `close_on_stop = false` to keep
-the tabs open. Browsers may refuse `window.close()` for externally opened tabs;
+to this instance before stopping its server. Browsers may refuse `window.close()` for externally opened tabs;
 in that case the document stays readable with a “Preview ended” message. Ordinary
 connection failures still reconnect and do not close the tab. In takeover mode,
 exiting a secondary instance does not close the primary instance's shared tab.
@@ -330,7 +328,7 @@ Browser-side libraries are loaded from CDN (cached by your browser):
 ## Testing
 
 - `tests/token_auth_test.lua` covers the Neovim lifecycle, token-protected HTTP routes, relative asset boundaries, buffer following, and cleanup.
-- `tests/close_test.lua` checks close-event delivery on stop and exit, opt-out, and restart with a real SSE connection (put this repository and live-server.nvim on runtimepath).
+- `tests/close_test.lua` checks close-event delivery on stop and exit, and restart with a real SSE connection (put this repository and live-server.nvim on runtimepath).
 - `node tests/close_test.cjs` checks browser close-event handling and the fallback message without external dependencies.
 - Open `tests/browser_test.html` directly in a browser for browser-side checks. They run automatically and report a green or red status for each dependency; no Node installation or downloaded test browser is required.
 
