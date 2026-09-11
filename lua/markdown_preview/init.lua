@@ -11,6 +11,7 @@ M.config = {
 	port = 0, -- 0 = auto; effective port depends on instance_mode
 	host = "127.0.0.1", -- bind address; "0.0.0.0" for network access (e.g. over SSH)
 	open_browser = true,
+	close_on_stop = true, -- ask owned preview tabs to close on stop/editor exit
 
 	-- nil = system default browser. String for app/binary name (e.g. "Firefox",
 	-- "google-chrome"). Table for full command with args (URL is appended).
@@ -750,8 +751,19 @@ function M.stop()
 		M._augroup = nil
 	end
 	if M._server_instance then
-		pcall(ls_server.stop, M._server_instance)
+		local instance = M._server_instance
 		M._server_instance = nil
+		if M.config.close_on_stop then
+			pcall(ls_server.send_event, instance, "markdown-preview-close", "{}")
+			-- stop() closes sockets immediately. Allow the close event to flush,
+			-- including during VimLeavePre, but never wait indefinitely for a tab.
+			if ls_server.connected_client_count(instance) > 0 then
+				vim.wait(100, function()
+					return ls_server.connected_client_count(instance) == 0
+				end, 10)
+			end
+		end
+		pcall(ls_server.stop, instance)
 	end
 	click.stop(M._click_server)
 	M._click_server = nil

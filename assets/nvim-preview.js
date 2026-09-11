@@ -311,6 +311,22 @@
 
     function connectSSE(core) {
         const evtSource = new EventSource(withToken('/__live/events'));
+        evtSource.addEventListener('markdown-preview-close', () => {
+            evtSource.close();
+            window.close();
+            // Externally opened tabs may not be script-closable. Keep the
+            // document readable and explain why this page remains open.
+            if (!document.getElementById('markdown-preview-ended')) {
+                const status = document.createElement('div');
+                status.id = 'markdown-preview-ended';
+                status.setAttribute('role', 'status');
+                status.textContent = 'Preview ended. You can close this tab.';
+                status.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);'
+                    + 'padding:10px 16px;border-radius:6px;background:Canvas;color:CanvasText;'
+                    + 'box-shadow:0 2px 12px #0003;z-index:2147483647;font:14px system-ui,sans-serif';
+                document.body.appendChild(status);
+            }
+        });
         evtSource.addEventListener('reload', () => sync(core, false));
         evtSource.addEventListener('scroll', event => {
             if (scrollSyncPaused) return;
@@ -378,8 +394,8 @@
             }
         }).observe(core.contentElement);
 
-        await sync(core, true);
         connectSSE(core);
+        await sync(core, true);
     }
 
     if (window.markdownPreviewCore) start(window.markdownPreviewCore);
