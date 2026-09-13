@@ -88,7 +88,7 @@ M._active_bufnr = nil
 M._last_text_by_buf = {}
 M._last_asset_context_by_buf = {}
 M._server_instance = nil
-M._debounce_seq = 0
+M._refresh_timer = nil
 M._workspace_dir = nil
 M._last_scroll_line = nil
 M._is_primary = nil      -- true/false/nil (takeover mode)
@@ -403,14 +403,13 @@ local function maybe_refresh(bufnr, silent)
 end
 
 local function debounced_refresh(bufnr)
-	M._debounce_seq = M._debounce_seq + 1
-	local this_call = M._debounce_seq
-	vim.defer_fn(function()
-		if this_call ~= M._debounce_seq then
-			return
+	M._refresh_timer = M._refresh_timer or assert(vim.uv.new_timer())
+	local timer = M._refresh_timer
+	timer:start(M.config.debounce_ms, 0, vim.schedule_wrap(function()
+		if M._refresh_timer == timer and M._active_bufnr == bufnr then
+			pcall(maybe_refresh, bufnr, true)
 		end
-		pcall(maybe_refresh, bufnr, true)
-	end, M.config.debounce_ms)
+	end))
 end
 
 ---------------------------------------------------------------------------
@@ -443,16 +442,12 @@ local function set_autocmds_for_buffer(bufnr)
 	M._augroup = vim.api.nvim_create_augroup("MarkdownPreviewAuto", { clear = true })
 
 	if M.config.auto_refresh then
-		for _, ev in ipairs(M.config.auto_refresh_events) do
-			vim.api.nvim_create_autocmd(ev, {
-				group = M._augroup,
-				buffer = bufnr,
-				callback = function()
-					debounced_refresh(bufnr)
-				end,
-				desc = "Markdown Preview auto-refresh (debounced)",
-			})
-		end
+		vim.api.nvim_create_autocmd(M.config.auto_refresh_events, {
+			group = M._augroup,
+			buffer = bufnr,
+			callback = function() debounced_refresh(bufnr) end,
+			desc = "Markdown Preview auto-refresh (debounced)",
+		})
 
 		-- :cd, :lcd, and :tcd can widen or narrow the root used for relative
 		-- assets without changing the Markdown buffer. DirChanged is not a
@@ -470,14 +465,12 @@ local function set_autocmds_for_buffer(bufnr)
 	end
 
 	if M.config.scroll_sync then
-		for _, ev in ipairs({ "CursorMoved", "CursorMovedI" }) do
-			vim.api.nvim_create_autocmd(ev, {
-				group = M._augroup,
-				buffer = bufnr,
-				callback = function() send_scroll_sync(bufnr) end,
-				desc = "Markdown Preview scroll sync",
-			})
-		end
+		vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+			group = M._augroup,
+			buffer = bufnr,
+			callback = function() send_scroll_sync(bufnr) end,
+			desc = "Markdown Preview scroll sync",
+		})
 	end
 
 	if M.config.follow_current_buffer then
@@ -745,6 +738,11 @@ function M.refresh()
 end
 
 function M.stop()
+	if M._refresh_timer then
+		M._refresh_timer:stop()
+		M._refresh_timer:close()
+		M._refresh_timer = nil
+	end
 	if M._augroup then
 		pcall(vim.api.nvim_del_augroup_by_id, M._augroup)
 		M._augroup = nil
