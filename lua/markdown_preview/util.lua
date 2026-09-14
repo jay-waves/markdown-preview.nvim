@@ -3,44 +3,28 @@ local M = {}
 
 local sep = package.config:sub(1, 1)
 
-local function dirname(path)
-	return path:match("^(.*" .. sep .. ")") or "./"
-end
-
-function M.mkdirp(path)
-	if vim.fn.isdirectory(path) == 0 then
-		vim.fn.mkdir(path, "p")
-	end
-end
-
 function M.file_exists(path)
 	if not path then
 		return false
 	end
-	local stat = vim.loop.fs_stat(path)
+	local stat = vim.uv.fs_stat(path)
 	return stat and stat.type == "file"
-end
-
-function M.write_text(path, text)
-	M.mkdirp(dirname(path))
-	local fd = assert(vim.loop.fs_open(path, "w", 420)) -- 0644
-	assert(vim.loop.fs_write(fd, text, 0))
-	assert(vim.loop.fs_close(fd))
 end
 
 function M.read_text(path)
 	assert(type(path) == "string" and #path > 0, "read_text: path is nil")
-	local fd = assert(vim.loop.fs_open(path, "r", 420))
-	local stat = assert(vim.loop.fs_fstat(fd))
-	local data = assert(vim.loop.fs_read(fd, stat.size, 0))
-	assert(vim.loop.fs_close(fd))
+	local fd = assert(vim.uv.fs_open(path, "r", 420))
+	local stat = assert(vim.uv.fs_fstat(fd))
+	local data = assert(vim.uv.fs_read(fd, stat.size, 0))
+	assert(vim.uv.fs_close(fd))
 	return data
 end
 
----Resolve a file shipped with the plugin using runtimepath first.
----@param rel string
+---Resolve a file shipped in markdown_preview/assets.
+---@param name string
 ---@return string|nil
-function M.resolve_asset(rel)
+function M.resolve_asset(name)
+	local rel = "lua/markdown_preview/assets/" .. name
 	-- Prefer runtimepath discovery (robust across plugin managers and symlinks)
 	local hits = vim.api.nvim_get_runtime_file(rel, false)
 	if hits and #hits > 0 then
@@ -53,9 +37,9 @@ function M.resolve_asset(rel)
 	if this:sub(1, 1) == "@" then
 		this = this:sub(2)
 	end
-	local root = this:match("(.-)" .. sep .. "lua" .. sep .. "markdown_preview" .. sep .. "util%.lua$")
-	if root then
-		local candidate = table.concat({ root, rel }, sep)
+	local module_dir = this:match("(.-)" .. sep .. "util%.lua$")
+	if module_dir then
+		local candidate = table.concat({ module_dir, "assets", name }, sep)
 		if M.file_exists(candidate) then
 			return candidate
 		end
@@ -109,44 +93,9 @@ function M.open_in_browser(url, browser)
 		return
 	end
 
-	local candidates
-	if vim.fn.has("mac") == 1 then
-		candidates = { { "open", url } }
-	elseif vim.fn.has("wsl") == 1 then
-		-- WSL: Windows interop may be disabled or off PATH (issue #26), so
-		-- try the usual launchers in order instead of assuming one works.
-		candidates = {
-			{ "wslview", url },
-			{ "explorer.exe", url },
-			{ "powershell.exe", "-NoProfile", "-Command", "Start-Process '" .. url .. "'" },
-		}
-	elseif vim.fn.has("unix") == 1 then
-		candidates = { { "xdg-open", url } }
-	elseif vim.fn.has("win32") == 1 then
-		candidates = { { "cmd.exe", "/c", "start", url } }
-	else
-		candidates = {}
-	end
-
-	for _, cmd in ipairs(candidates) do
-		if vim.fn.executable(cmd[1]) == 1 and try_launch(cmd) then
-			return
-		end
-	end
-	warn("could not open a browser automatically")
-end
-
----Generate a per-buffer workspace directory under Neovim's cache.
----@param bufnr integer
----@return string
-function M.workspace_for_buffer(bufnr)
-	local name = vim.api.nvim_buf_get_name(bufnr)
-	local hash = vim.fn.sha256(name):sub(1, 12)
-	return vim.fs.joinpath(vim.fn.stdpath("cache"), "markdown-preview", hash)
-end
-
-function M.shared_workspace()
-	return vim.fs.joinpath(vim.fn.stdpath("cache"), "markdown-preview", "shared")
+	local ok, _, err = pcall(vim.ui.open, url)
+	if not ok then err = _ end
+	if err then warn(tostring(err)) end
 end
 
 return M

@@ -7,7 +7,7 @@ local ls_util = require("live_server.util")
 local M = {}
 
 M.config = {
-	port = 0, -- 0 = auto; effective port depends on instance_mode
+	port = 0, -- 0 = auto
 	host = "127.0.0.1", -- bind address; "0.0.0.0" for network access (e.g. over SSH)
 	open_browser = true,
 
@@ -16,30 +16,17 @@ M.config = {
 	-- On macOS, string values are passed via `open -a <name>`.
 	browser = nil,
 
-	-- "takeover" = shared workspace + fixed port, one browser tab across instances
-	-- "multi" = per-instance server + browser tab (port 0 recommended)
-	instance_mode = "multi",
-
-	content_name = "content.md",
-	index_name = "index.html",
-
 	-- Path or ordered list of paths to CSS files injected after the bundled
 	-- styles. Supports ~ and $VARS. "" or {} = disabled.
 	custom_css = "",
 
-	-- nil = per-buffer workspace (recommended); set a path to override
-	workspace_dir = nil,
-
-	overwrite_index_on_start = true,
-
 	auto_refresh = true,
-	auto_refresh_events = { "InsertLeave", "TextChanged", "TextChangedI", "BufWritePost" },
+	auto_refresh_events = { "TextChanged", "TextChangedI", "BufWritePost" },
 	debounce_ms = 300,
-	notify_on_refresh = false,
 
 	-- After the first :MarkdownPreview, reuse the same server and browser tab
 	-- when entering another Markdown buffer. Non-Markdown buffers are ignored.
-	follow_current_buffer = false,
+	follow_current_buffer = true,
 
 	-- Load ELK layout engine for mermaid diagrams (requires internet; adds ~800 KB).
 	-- Enables %%{init: {"layout": "elk"}}%% in diagrams.
@@ -81,73 +68,25 @@ function M.setup(opts)
 	M.config.bottom_padding = math.max(0, math.min(1, M.config.bottom_padding))
 end
 
--- Internal state
-M._augroup = nil
-M._active_bufnr = nil
-M._last_text_by_buf = {}
-M._last_asset_context_by_buf = {}
-M._server_instance = nil
-M._refresh_timer = nil
-M._workspace_dir = nil
-M._last_scroll_line = nil
-M._is_primary = nil      -- true/false/nil (takeover mode)
-M._takeover_port = nil   -- port of primary server (secondary uses for HTTP events)
-M._token = nil           -- preview server auth token
-
-local function effective_port()
-	if M.config.port ~= 0 then return M.config.port end
-	if M.config.instance_mode == "takeover" then return 8421 end
-	return 0
-end
-
-local function host_is_loopback()
-	return M.config.host == "127.0.0.1" or M.config.host == "localhost"
-end
-
----------------------------------------------------------------------------
--- Workspace
----------------------------------------------------------------------------
-
-local function resolve_workspace(bufnr)
-	if M.config.workspace_dir then
-		return M.config.workspace_dir
-	end
-	return util.workspace_for_buffer(bufnr)
-end
-
-local function ensure_workspace(bufnr)
-	local dir = resolve_workspace(bufnr)
-	util.mkdirp(dir)
-	return dir
-end
+-- One private session owns the server, document, and callbacks.
+local session
 
 ---------------------------------------------------------------------------
 -- Index HTML
 ---------------------------------------------------------------------------
 
-local function write_nvim_adapter(dir)
-	local src = util.resolve_asset("assets/nvim-preview.js")
+local function render_index(token)
+	local src = util.resolve_asset("index.html")
 	if not src then
-		error("Could not locate assets/nvim-preview.js in runtimepath. Make sure the plugin ships it.")
-	end
-	local dst = vim.fs.joinpath(dir, "nvim-preview.js")
-	util.write_text(dst, util.read_text(src))
-	return dst
-end
-
-local function write_index(dir)
-	local dst = vim.fs.joinpath(dir, M.config.index_name)
-	local src = util.resolve_asset("assets/index.html")
-	if not src then
-		error("Could not locate assets/index.html in runtimepath. Make sure the plugin ships it.")
+		error("Could not locate markdown_preview/assets/index.html")
 	end
 	local content = util.read_text(src)
 
 	-- Inline the shipped Markdown and syntax themes. Keeping them as separate
 	-- assets makes the preview shell independent from replaceable typography.
 	for placeholder, asset in pairs({
-		__MARKDOWN_THEME_CSS__ = "assets/theme.css",
-		__HIGHLIGHT_THEME_CSS__ = "assets/highlight.css",
+		__MARKDOWN_THEME_CSS__ = "theme.css",
+		__HIGHLIGHT_THEME_CSS__ = "highlight.css",
 	}) do
 		local css_path = util.resolve_asset(asset)
 		if not css_path then
@@ -179,9 +118,8 @@ local function write_index(dir)
 	-- index remains a standalone renderer with no Neovim protocol attributes.
 	local host_attrs = table.concat({
 		'data-bottom-padding="' .. tostring(M.config.bottom_padding) .. '"',
-		'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"',
-		'data-click-to-nvim="' ..
-			(M.config.instance_mode == "multi" and M.config.click_to_nvim and "true" or "false") .. '"',
+		'data-live-token="' .. token .. '"',
+		'data-click-to-nvim="' .. (M.config.click_to_nvim and "true" or "false") .. '"',
 	}, " ")
 	content = content:gsub('<html lang="en"', function()
 		return '<html lang="en" ' .. host_attrs
@@ -216,50 +154,16 @@ local function write_index(dir)
 		end, 1)
 	end
 
-	util.write_text(dst, content)
-	return dst
-end
-
-local function write_index_if_needed(dir)
-	-- The host adapter is deliberately separate from the reusable renderer
-	-- document, but must live beside the generated index for static serving.
-	write_nvim_adapter(dir)
-	if M.config.overwrite_index_on_start then
-		return write_index(dir)
-	end
-	local dst = vim.fs.joinpath(dir, M.config.index_name)
-	if not util.file_exists(dst) then
-		return write_index(dir)
-	end
-	-- Rewrite a persisted index whose baked token no longer matches what this
-	-- session serves. Covers a fresh token after restart AND a loopback<->
-	-- network switch (which flips whether the token is baked at all) — a stale
-	-- non-empty token on a network bind would otherwise 401 every request.
-	local want = 'data-live-token="' .. (host_is_loopback() and (M._token or "") or "") .. '"'
-	local ok, existing = pcall(util.read_text, dst)
-	if not ok or not existing:find(want, 1, true) then
-		return write_index(dir)
-	end
-	return dst
+	return content
 end
 
 ---------------------------------------------------------------------------
 -- Content writing (unified: markdown or mermaid)
 ---------------------------------------------------------------------------
 
-local function extract_mermaid_under_cursor_strict(bufnr)
-	local ok, text = pcall(ts.extract_under_cursor, bufnr)
-	if ok and text and #text > 0 then
-		return text
-	end
-	return nil
-end
-
 local function extract_mermaid_under_cursor(bufnr)
-	local text = extract_mermaid_under_cursor_strict(bufnr)
-	if text and #text > 0 then
-		return text
-	end
+	local ok, text = pcall(ts.extract_under_cursor, bufnr)
+	if ok and text and text ~= "" then return text end
 	local fallback = ts.fallback_scan(bufnr)
 	if not fallback or #fallback == 0 then
 		error("No ```mermaid fenced code block found under (or above) the cursor")
@@ -276,11 +180,11 @@ end
 local function get_content(bufnr)
 	local text
 	local ft = vim.bo[bufnr].filetype
+	local name = vim.api.nvim_buf_get_name(bufnr)
 	if ft == "markdown" then
 		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 		text = table.concat(lines, "\n")
-	elseif vim.api.nvim_buf_get_name(bufnr):match("%.mmd$")
-        or vim.api.nvim_buf_get_name(bufnr):match("%.mermaid$") then
+	elseif name:match("%.mmd$") or name:match("%.mermaid$") then
 		-- .mmd / .mermaid files: treat entire buffer as mermaid
 		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 		text = "```mermaid\n" .. table.concat(lines, "\n") .. "\n```\n"
@@ -291,17 +195,6 @@ local function get_content(bufnr)
 	end
 
 	return text
-end
-
----Same as get_content but never errors (returns nil on failure).
----@param bufnr integer
----@return string|nil
-local function get_content_safe(bufnr)
-	local ok, text = pcall(get_content, bufnr)
-	if ok and text and #text > 0 then
-		return text
-	end
-	return nil
 end
 
 local function asset_context(bufnr)
@@ -329,81 +222,50 @@ local function asset_context(bufnr)
 	return src_dir, ""
 end
 
-local function write_content(dir, text, bufnr)
-	local path = vim.fs.joinpath(dir, M.config.content_name)
-	-- Sidecars record the allowed :pwd root and the source directory relative
-	-- to it. Writing them before content.md ensures the file-watch reload cannot
-	-- race ahead with stale asset context in takeover/follow-buffer modes.
-	if bufnr then
-		local root, prefix = asset_context(bufnr)
-		pcall(util.write_text, vim.fs.joinpath(dir, "asset_root"), root or "")
-		pcall(util.write_text, vim.fs.joinpath(dir, "asset_prefix"), prefix)
-		M._last_asset_context_by_buf[bufnr] = root and (root .. "\0" .. prefix) or nil
-	end
-	util.write_text(path, text)
-	return path
+local function initial_scroll(bufnr)
+	if M.config.initial_scroll == false then return nil end
+	local winid = vim.api.nvim_get_current_buf() == bufnr and vim.api.nvim_get_current_win()
+		or vim.fn.win_findbuf(bufnr)[1]
+	if not winid then return nil end
+	return {
+		id = tostring(vim.uv.hrtime()) .. ":" .. tostring(vim.fn.getpid()),
+		line = vim.api.nvim_win_get_cursor(winid)[1] - 1,
+		total = vim.api.nvim_buf_line_count(bufnr),
+	}
 end
 
-local function write_initial_scroll(dir, bufnr)
-	local payload = ""
-	if M.config.initial_scroll ~= false then
-		local winid = vim.api.nvim_get_current_win()
-		if vim.api.nvim_get_current_buf() ~= bufnr then
-			local wins = vim.fn.win_findbuf(bufnr)
-			winid = wins[1]
-		end
-		if winid then
-			local line = vim.api.nvim_win_get_cursor(winid)[1] - 1
-			payload = vim.json.encode({
-				id = tostring(vim.loop.hrtime()) .. ":" .. tostring(vim.fn.getpid()),
-				line = line,
-				total = vim.api.nvim_buf_line_count(bufnr),
-			})
-		end
-	end
-	pcall(util.write_text, vim.fs.joinpath(dir, "initial_scroll"), payload)
+local function update_document(s, bufnr, text, reset)
+	local root, prefix = asset_context(bufnr)
+	local name = vim.api.nvim_buf_get_name(bufnr)
+	local title = name ~= "" and vim.fn.fnamemodify(name, ":t") or "Markdown Preview"
+	local previous = s.document
+	if not reset and previous and previous.content == text and previous.title == title
+		and previous.assetPrefix == prefix and s.asset_root == root then return end
+	local position = previous and previous.initialScroll
+	if reset then position = initial_scroll(bufnr) end
+	if s.bufnr ~= bufnr then s.last_scroll_line = nil end
+	s.bufnr, s.asset_root = bufnr, root
+	s.document = {
+		content = text,
+		assetPrefix = prefix,
+		title = title,
+		initialScroll = position,
+	}
+	if s.server then ls_server.send_event(s.server, "reload") end
 end
 
 ---------------------------------------------------------------------------
 -- Refresh logic
 ---------------------------------------------------------------------------
 
-local function maybe_refresh(bufnr, silent)
-	bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-	local text = get_content_safe(bufnr)
-	if not text then
-		return false
-	end
-
-	local asset_root, asset_prefix = asset_context(bufnr)
-	local asset_key = asset_root and (asset_root .. "\0" .. asset_prefix) or nil
-	if M._last_text_by_buf[bufnr] == text and M._last_asset_context_by_buf[bufnr] == asset_key then
-		return false
-	end
-
-	local dir = M._workspace_dir or ensure_workspace(bufnr)
-	write_content(dir, text, bufnr)
-	M._last_text_by_buf[bufnr] = text
-
-	-- Notify the embedded preview server of the content change.
-	-- In secondary takeover mode, M._server_instance is nil — fs_watch handles reload
-	if M._server_instance then
-		pcall(ls_server.reload, M._server_instance, M.config.content_name)
-	end
-
-	if not silent and M.config.notify_on_refresh then
-		vim.notify("Markdown preview updated", vim.log.levels.INFO)
-	end
-	return true
-end
-
-local function debounced_refresh(bufnr)
-	M._refresh_timer = M._refresh_timer or assert(vim.uv.new_timer())
-	local timer = M._refresh_timer
+local function debounced_refresh(s)
+	local bufnr = s.bufnr
+	s.timer = s.timer or assert(vim.uv.new_timer())
+	local timer = s.timer
 	timer:start(M.config.debounce_ms, 0, vim.schedule_wrap(function()
-		if M._refresh_timer == timer and M._active_bufnr == bufnr then
-			pcall(maybe_refresh, bufnr, true)
+		if session == s and s.bufnr == bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+			local ok, text = pcall(get_content, bufnr)
+			if ok then update_document(s, bufnr, text, false) end
 		end
 	end))
 end
@@ -413,35 +275,29 @@ end
 ---------------------------------------------------------------------------
 
 --- Send cursor line to browser for scroll sync.
-local function send_scroll_sync(bufnr)
+local function send_scroll_sync(s)
 	if not M.config.scroll_sync then return end
 	local cursor_line = vim.api.nvim_win_get_cursor(0)[1] -- 1-based
-	if cursor_line == M._last_scroll_line then return end
-	M._last_scroll_line = cursor_line
-	local total = vim.api.nvim_buf_line_count(bufnr)
+	if cursor_line == s.last_scroll_line then return end
+	s.last_scroll_line = cursor_line
+	local total = vim.api.nvim_buf_line_count(s.bufnr)
 	local payload = vim.json.encode({ line = cursor_line - 1, total = total })
-	if M._server_instance then
-		pcall(ls_server.send_event, M._server_instance, "scroll", payload)
-	elseif M._takeover_port then
-		require("markdown_preview.remote").send_event(M._takeover_port, "scroll", payload, M._token)
-	end
+	ls_server.send_event(s.server, "scroll", payload)
 end
 
 ---------------------------------------------------------------------------
 -- Autocmds
 ---------------------------------------------------------------------------
 
-local function set_autocmds_for_buffer(bufnr)
-	if M._augroup then
-		pcall(vim.api.nvim_del_augroup_by_id, M._augroup)
-	end
-	M._augroup = vim.api.nvim_create_augroup("MarkdownPreviewAuto", { clear = true })
+local function set_autocmds(s)
+	s.group = vim.api.nvim_create_augroup("MarkdownPreviewAuto", { clear = true })
 
 	if M.config.auto_refresh then
 		vim.api.nvim_create_autocmd(M.config.auto_refresh_events, {
-			group = M._augroup,
-			buffer = bufnr,
-			callback = function() debounced_refresh(bufnr) end,
+			group = s.group,
+			callback = function(args)
+				if session == s and args.buf == s.bufnr then debounced_refresh(s) end
+			end,
 			desc = "Markdown Preview auto-refresh (debounced)",
 		})
 
@@ -449,12 +305,9 @@ local function set_autocmds_for_buffer(bufnr)
 		-- assets without changing the Markdown buffer. DirChanged is not a
 		-- buffer-local event, so refresh the active preview buffer explicitly.
 		vim.api.nvim_create_autocmd("DirChanged", {
-			group = M._augroup,
+			group = s.group,
 			callback = function()
-				local active = M._active_bufnr
-				if active and vim.api.nvim_buf_is_valid(active) then
-					debounced_refresh(active)
-				end
+				if session == s then debounced_refresh(s) end
 			end,
 			desc = "Markdown Preview: refresh relative assets after cwd changes",
 		})
@@ -462,28 +315,28 @@ local function set_autocmds_for_buffer(bufnr)
 
 	if M.config.scroll_sync then
 		vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
-			group = M._augroup,
-			buffer = bufnr,
-			callback = function() send_scroll_sync(bufnr) end,
+			group = s.group,
+			callback = function(args)
+				if session == s and args.buf == s.bufnr then send_scroll_sync(s) end
+			end,
 			desc = "Markdown Preview scroll sync",
 		})
 	end
 
 	if M.config.follow_current_buffer then
 		vim.api.nvim_create_autocmd("BufEnter", {
-			group = M._augroup,
+			group = s.group,
 			callback = function(args)
-				if not M._token
-					or args.buf == M._active_bufnr
+				if session ~= s
+					or args.buf == s.bufnr
 					or vim.bo[args.buf].filetype ~= "markdown"
 				then
 					return
 				end
 
-				-- Retarget after BufEnter finishes. start() recreates this
-				-- augroup for the new active buffer.
+				-- Follow after BufEnter finishes; callbacks belong to this session.
 				vim.schedule(function()
-					if M._token and vim.api.nvim_get_current_buf() == args.buf then
+					if session == s and vim.api.nvim_get_current_buf() == args.buf then
 						M.start()
 					end
 				end)
@@ -500,7 +353,7 @@ end
 -- When bound to 0.0.0.0 detect the outbound LAN IP via a UDP connect trick
 -- (no packets are sent; it just lets the kernel pick the right interface).
 local function lan_ip()
-	local udp = vim.loop.new_udp()
+	local udp = vim.uv.new_udp()
 	if not udp then return "127.0.0.1" end
 	local ok = pcall(function() udp:connect("8.8.8.8", 80) end)
 	local addr = ok and udp:getsockname()
@@ -511,17 +364,14 @@ end
 -- Build the URL the browser opens to. Embeds the auth token when one exists
 -- so the first request includes it (the page then stashes it in
 -- sessionStorage for refreshes).
-local function browser_url(port)
+local function browser_url(port, token)
 	local display_host = (M.config.host == "0.0.0.0") and lan_ip() or M.config.host
 	local base = ("http://%s:%d/"):format(display_host, port)
-	if M._token and M._token ~= "" then
-		return base .. "?t=" .. M._token
-	end
-	return base
+	return base .. "?t=" .. token
 end
 
-local function scroll_nvim_to_line(line)
-	local bufnr = M._active_bufnr
+local function scroll_nvim_to_line(s, line)
+	local bufnr = s.bufnr
 	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
 	local wins = vim.fn.win_findbuf(bufnr)
 	if #wins == 0 then return end
@@ -540,129 +390,46 @@ end
 
 function M.start()
 	local bufnr = vim.api.nvim_get_current_buf()
-	M._active_bufnr = bufnr
-
-	-- Takeover coordination (lock probe + cross-instance events) talks to
-	-- 127.0.0.1, which a specific-interface bind does not answer on. Only
-	-- loopback and the wildcard are supported there; multi mode has no such
-	-- coupling and accepts any bind address.
-	if M.config.instance_mode == "takeover" and not host_is_loopback() and M.config.host ~= "0.0.0.0" then
-		vim.notify(
-			'Markdown Preview: takeover mode supports host = "127.0.0.1" or "0.0.0.0" only.\n'
-				.. 'Use "0.0.0.0" for LAN access, or instance_mode = "multi" to bind a specific interface.',
-			vim.log.levels.ERROR
-		)
-		return
-	end
-
 	local ok_content, text = pcall(get_content, bufnr)
 	if not ok_content then
 		vim.notify("Markdown Preview: " .. tostring(text), vim.log.levels.ERROR)
 		return
 	end
-
-	-- Resolve workspace: shared (takeover) or per-buffer (multi)
-	local dir
-	if M.config.instance_mode == "takeover" then
-		dir = util.shared_workspace()
-	else
-		dir = ensure_workspace(bufnr)
-	end
-	util.mkdirp(dir)
-	M._workspace_dir = dir
-
-	-- Decide role + token BEFORE writing index.html. The index bakes the
-	-- token in via the __LIVE_TOKEN__ placeholder, so we need it ready.
-	if M.config.instance_mode == "takeover" and not M._server_instance then
-		local lock = require("markdown_preview.lock")
-		local lock_data = lock.read()
-		if lock_data and lock.is_server_alive(lock_data.port) then
-			-- Secondary: server is already running in another Neovim
-			-- instance. Adopt its token so our scroll-sync RPC works.
-			M._is_primary = false
-			M._takeover_port = lock_data.port
-			M._token = lock_data.token
-			write_content(dir, text, bufnr)
-			write_initial_scroll(dir, bufnr)
-			M._last_text_by_buf[bufnr] = text
-			set_autocmds_for_buffer(bufnr)
-			if type(M.config.hooks.on_start) == "function" then
-				M.config.hooks.on_start(browser_url(lock_data.port))
-			end
-			return
-		end
-		-- Stale lock or no lock, we become primary
-		lock.remove()
-	end
-
-	-- Primary path (takeover) or single-instance (multi). Generate a token
-	-- once per server lifetime and reuse it across retargets.
-	if not M._token or M._token == "" then
-		M._token = ls_util.random_token(16)
-	end
-
-	write_index_if_needed(dir)
-	write_content(dir, text, bufnr)
-	write_initial_scroll(dir, bufnr)
-	M._last_text_by_buf[bufnr] = text
-
-	set_autocmds_for_buffer(bufnr)
-
-	-- Patterns matching workspace-served files that require ?t=<token>.
-	-- vim.pesc escapes every Lua-pattern magic char, so custom content_name /
-	-- index_name values containing '-', '+', '.', etc. still gate correctly.
-	local content_path_pattern = "^/" .. vim.pesc(M.config.content_name) .. "$"
-
-	-- The asset_root sidecar is gated too: it holds the source file's
-	-- directory path, which is nobody's business but ours.
-	local protected = { content_path_pattern, "^/asset_root$", "^/asset_prefix$", "^/initial_scroll$" }
-	if not host_is_loopback() then
-		-- On a network bind the index page must be gated too: it is the
-		-- browser's bootstrap document, and serving it openly would hand the
-		-- preview to any peer that can reach the port. The tokenized ?t= URL
-		-- (printed by hooks.on_start / opened by the browser) unlocks it.
-		table.insert(protected, "^/$")
-		table.insert(protected, "^/" .. vim.pesc(M.config.index_name) .. "$")
-	end
+	local s = session or { token = ls_util.random_token(16) }
+	update_document(s, bufnr, text, true)
 
 	-- Start the embedded preview server if not already running.
-	if not M._server_instance then
-		local port = effective_port()
-		local index_path = vim.fs.joinpath(dir, M.config.index_name)
+	if not s.server then
+		local port = M.config.port
+		local index = render_index(s.token)
+		local asset_dir = vim.fs.dirname(assert(util.resolve_asset("index.html")))
 		local ok, inst = pcall(ls_server.start, {
 			port = port,
 			host = M.config.host,
-			root = dir,
-			default_index = index_path,
+			root = asset_dir,
 			headers = { ["Cache-Control"] = "no-cache" },
-			-- No cors: the preview page is same-origin and remote.lua talks raw
-			-- TCP. A wildcard ACAO would let any website in the user's browser
-			-- read the token out of the (unauthenticated) index page.
-			live = {
-				enabled = true,
-				inject_script = false,
-				debounce = 100,
-			},
+			live = { enabled = false, inject_script = false },
 			features = { dirlist = { enabled = false } },
-			token = M._token,
-			protected_paths = protected,
+			token = s.token,
+			routes = {
+				["/"] = function()
+					return index, 200, { ["Content-Type"] = "text/html; charset=utf-8" }
+				end,
+				["/document"] = function()
+					return vim.json.encode(s.document), 200, { ["Content-Type"] = "application/json" }
+				end,
+			},
 			-- Resolve relative image paths against the source file's dir
-			-- (issue #17). Read per request so takeover secondaries and
-			-- buffer switches retarget it via the sidecar.
+			-- (issue #17). Read current in-memory state per request.
 			asset_root = function()
-				local ws = M._workspace_dir
-				if not ws then return nil end
-				local ok_read, data = pcall(util.read_text, vim.fs.joinpath(ws, "asset_root"))
-				if not ok_read or not data or data == "" then return nil end
-				return (data:gsub("%s+$", ""))
+				return s.asset_root
 			end,
 			on_event = function(event, data)
-				if event ~= "markdown-click" or M.config.instance_mode ~= "multi"
-					or not M.config.click_to_nvim then return end
+				if session ~= s or event ~= "markdown-click" or not M.config.click_to_nvim then return end
 				local ok_decode, value = pcall(vim.json.decode, data)
 				if ok_decode and type(value) == "table" and type(value.line) == "number"
 					and value.line >= 0 and value.line % 1 == 0 then
-					scroll_nvim_to_line(value.line)
+					scroll_nvim_to_line(s, value.line)
 				end
 			end,
 		})
@@ -673,64 +440,41 @@ function M.start()
 			)
 			return
 		end
-		M._server_instance = inst
-		M._is_primary = true
-		M._takeover_port = nil
-
-		-- Write lock file in takeover mode
-		if M.config.instance_mode == "takeover" then
-			require("markdown_preview.lock").write(inst.port, dir, M._token)
-		end
+		s.server = inst
+		s.url = browser_url(inst.port, s.token)
+		session = s
+		set_autocmds(s)
 
 		if type(M.config.hooks.on_start) == "function" then
-			M.config.hooks.on_start(browser_url(inst.port))
-		end
-
-		if M.config.open_browser then
-			vim.defer_fn(function()
-				util.open_in_browser(browser_url(inst.port), M.config.browser)
-			end, 200)
-		end
-	else
-		-- Server already running, retarget to this buffer's workspace
-		local index_path = vim.fs.joinpath(dir, M.config.index_name)
-		pcall(ls_server.update_target, M._server_instance, dir, index_path)
-		pcall(ls_server.reload, M._server_instance, M.config.content_name)
-
-		if type(M.config.hooks.on_start) == "function" then
-			M.config.hooks.on_start(browser_url(M._server_instance.port))
-		end
-
-		-- No browser tab connected (user closed it)? Re-open.
-		if M.config.open_browser and ls_server.connected_client_count(M._server_instance) == 0 then
-			vim.defer_fn(function()
-				util.open_in_browser(browser_url(M._server_instance.port), M.config.browser)
-			end, 200)
+			M.config.hooks.on_start(s.url)
 		end
 	end
-end
-
-function M.refresh()
-	local bufnr = vim.api.nvim_get_current_buf()
-	local changed = maybe_refresh(bufnr, false)
-	if not changed and M.config.notify_on_refresh then
-		vim.notify("Markdown Preview: no changes detected", vim.log.levels.INFO)
+	-- Coalesce open requests and discard callbacks belonging to a stopped session.
+	if session == s and M.config.open_browser and not s.open_pending
+		and ls_server.connected_client_count(s.server) == 0 then
+		s.open_pending = true
+		vim.defer_fn(function()
+			s.open_pending = nil
+			if session == s and ls_server.connected_client_count(s.server) == 0 then
+				util.open_in_browser(s.url, M.config.browser)
+			end
+		end, 200)
 	end
 end
 
 function M.stop()
-	if M._refresh_timer then
-		M._refresh_timer:stop()
-		M._refresh_timer:close()
-		M._refresh_timer = nil
+	local s = session
+	if not s then return end
+	session = nil
+	if s.timer then
+		s.timer:stop()
+		s.timer:close()
 	end
-	if M._augroup then
-		pcall(vim.api.nvim_del_augroup_by_id, M._augroup)
-		M._augroup = nil
+	if s.group then
+		vim.api.nvim_del_augroup_by_id(s.group)
 	end
-	if M._server_instance then
-		local instance = M._server_instance
-		M._server_instance = nil
+	if s.server then
+		local instance = s.server
 		pcall(ls_server.send_event, instance, "markdown-preview-close", "{}")
 		-- stop() closes sockets immediately. Allow the close event to flush,
 		-- including during VimLeavePre, but never wait indefinitely for a tab.
@@ -741,15 +485,6 @@ function M.stop()
 		end
 		pcall(ls_server.stop, instance)
 	end
-	if M._is_primary then
-		require("markdown_preview.lock").remove()
-	end
-	M._workspace_dir = nil
-	M._active_bufnr = nil
-	M._last_scroll_line = nil
-	M._is_primary = nil
-	M._takeover_port = nil
-	M._token = nil
 
 	if type(M.config.hooks.on_stop) == "function" then
 		M.config.hooks.on_stop()

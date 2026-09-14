@@ -40,17 +40,6 @@
         scrollSyncPauseTimer = setTimeout(() => { scrollSyncPaused = false; }, 3000);
     }
 
-    async function fetchAssetPrefix() {
-        const previous = assetPrefix;
-        try {
-            const resp = await fetch(withToken('/asset_prefix'), { cache: 'no-store' });
-            assetPrefix = resp.ok ? (await resp.text()).trim().replace(/\\/g, '/') : '';
-        } catch (_) {
-            assetPrefix = '';
-        }
-        return assetPrefix !== previous;
-    }
-
     function resolveRelativeAssetPath(src, prefix) {
         const sentinel = '/__markdown_preview_asset_root__/';
         const encodedPrefix = prefix
@@ -176,28 +165,35 @@
         updateHeadingAvailability(section.closest('#content'));
     }
 
-    async function fetchContent() {
+    async function fetchDocument() {
         try {
-            const resp = await fetch(withToken('content.md?ts=' + Date.now()), { cache: 'no-store' });
+            const resp = await fetch(withToken('/document'), { cache: 'no-store' });
             if (!resp.ok) {
-                console.warn('[markdown-preview] content.md fetch failed:', resp.status);
+                console.warn('[markdown-preview] document fetch failed:', resp.status);
                 if (resp.status === 401) {
                     try { sessionStorage.removeItem('mdp-token'); } catch (_) {}
                 }
                 return null;
             }
-            return (await resp.text()).replace(/\r\n?/g, '\n');
+            return await resp.json();
         } catch (error) {
-            console.warn('[markdown-preview] content.md fetch error:', error);
+            console.warn('[markdown-preview] document fetch error:', error);
             return null;
         }
     }
 
-    async function sync(core, initial = false) {
-        const text = await fetchContent();
-        if (text == null) return;
-        const assetPrefixChanged = await fetchAssetPrefix();
-        if (!initial && text === lastContent && !assetPrefixChanged) return;
+    async function sync(core) {
+        const value = await fetchDocument();
+        if (!value || typeof value.content !== 'string') return;
+        const text = value.content.replace(/\r\n?/g, '\n');
+        const nextPrefix = typeof value.assetPrefix === 'string' ? value.assetPrefix.replace(/\\/g, '/') : '';
+        const assetPrefixChanged = nextPrefix !== assetPrefix;
+        assetPrefix = nextPrefix;
+        if (typeof value.title === 'string') document.title = value.title;
+        if (text === lastContent && !assetPrefixChanged) {
+            applyInitialScroll(core.contentElement, value.initialScroll);
+            return;
+        }
         lastContent = text;
 
         try {
@@ -245,7 +241,7 @@
 
             applyBottomPadding(core.contentElement);
             await core.renderMermaid();
-            await applyInitialScroll(core.contentElement);
+            applyInitialScroll(core.contentElement, value.initialScroll);
         } catch (error) {
             console.error('[markdown-preview] render error:', error);
             core.contentElement.innerHTML = '<pre style="white-space:pre-wrap;padding:1rem">' +
@@ -295,17 +291,10 @@
         window.scrollTo({ top: Math.max(0, offsetTop - window.innerHeight / 2) });
     }
 
-    async function applyInitialScroll(contentEl) {
-        try {
-            const resp = await fetch(withToken('/initial_scroll'), { cache: 'no-store' });
-            if (!resp.ok) return;
-            const text = (await resp.text()).trim();
-            if (!text) return;
-            const data = JSON.parse(text);
-            if (!data.id || data.id === lastInitialScrollId || data.line == null) return;
-            lastInitialScrollId = data.id;
-            scrollToSourceLine(contentEl, data.line, data.total || 1);
-        } catch (_) {}
+    function applyInitialScroll(contentEl, data) {
+        if (!data || !data.id || data.id === lastInitialScrollId || data.line == null) return;
+        lastInitialScrollId = data.id;
+        scrollToSourceLine(contentEl, data.line, data.total || 1);
     }
 
     function connectSSE(core) {
@@ -326,7 +315,7 @@
                 document.body.appendChild(status);
             }
         });
-        evtSource.addEventListener('reload', () => sync(core, false));
+        evtSource.addEventListener('reload', () => sync(core));
         evtSource.addEventListener('scroll', event => {
             if (scrollSyncPaused) return;
             try {
@@ -395,7 +384,7 @@
         }).observe(core.contentElement);
 
         connectSSE(core);
-        await sync(core, true);
+        await sync(core);
     }
 
     if (window.markdownPreviewCore) start(window.markdownPreviewCore);

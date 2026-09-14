@@ -16,12 +16,14 @@ require("typst_preview").setup()
 
 Commands:
 
-- `:MarkdownPreview`, `:MarkdownPreviewRefresh`, `:MarkdownPreviewStop`
+- `:MarkdownPreview`, `:MarkdownPreviewStop`
 - `:TypstPreview`, `:TypstPreviewStop`
 
 Typst requires `tinymist` on `PATH`. Its LSP remains responsible for compilation and source mapping; the bundled `typst_preview` module supplies the browser wrapper and cursor-following bridge.
 
-Markdown options are configured through `markdown_preview.setup()`. The implementation and browser assets live under `lua/markdown_preview`, `lua/typst_preview`, and `assets`.
+Markdown options are configured through `markdown_preview.setup()`. Each module keeps its browser assets in its own `assets` directory under `lua/markdown_preview` or `lua/typst_preview`.
+
+Markdown preview uses one server and browser tab per Neovim instance. By default, entering another Markdown buffer retargets that preview to the current buffer.
 
 ## Thanks
 
