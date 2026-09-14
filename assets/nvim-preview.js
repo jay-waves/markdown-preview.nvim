@@ -26,7 +26,6 @@
     };
 
     const CLICK_TO_NVIM = root.dataset.clickToNvim === 'true';
-    const CLICK_PORT = root.dataset.clickPort || '';
     let lastContent = null;
     let assetPrefix = '';
     let scrollSyncPaused = false;
@@ -377,15 +376,16 @@
         });
 
         core.contentElement.addEventListener('click', event => {
-            if (!CLICK_TO_NVIM || !CLICK_PORT) return;
+            if (!CLICK_TO_NVIM) return;
             if (event.target.closest('a, button, input, select, textarea, summary, .heading-summary')) return;
             const block = event.target.closest('[data-source-line]');
             if (!block) return;
             const line = Number(block.dataset.sourceLine);
             if (!Number.isInteger(line) || line < 0) return;
-            const url = `${location.protocol}//${location.hostname}:${CLICK_PORT}` +
-                `/__markdown_preview/click?line=${line}&t=${encodeURIComponent(LIVE_TOKEN)}`;
-            fetch(url, { mode: 'no-cors', cache: 'no-store', keepalive: true }).catch(() => {});
+            const data = encodeURIComponent(JSON.stringify({ line }));
+            fetch(withToken(`/__live/event?event=markdown-click&data=${data}`), {
+                cache: 'no-store', keepalive: true,
+            }).catch(() => {});
         });
 
         new ResizeObserver(() => {

@@ -1,7 +1,6 @@
 -- lua/markdown_preview/init.lua
 local ts = require("markdown_preview.ts")
 local util = require("markdown_preview.util")
-local click = require("markdown_preview.click")
 local ls_server = require("live_server.server")
 local ls_util = require("live_server.util")
 
@@ -93,8 +92,7 @@ M._workspace_dir = nil
 M._last_scroll_line = nil
 M._is_primary = nil      -- true/false/nil (takeover mode)
 M._takeover_port = nil   -- port of primary server (secondary uses for HTTP events)
-M._token = nil           -- live-server auth token (primary owns; secondaries read from lockfile)
-M._click_server = nil
+M._token = nil           -- preview server auth token
 
 local function effective_port()
 	if M.config.port ~= 0 then return M.config.port end
@@ -183,8 +181,7 @@ local function write_index(dir)
 		'data-bottom-padding="' .. tostring(M.config.bottom_padding) .. '"',
 		'data-live-token="' .. (host_is_loopback() and M._token or "") .. '"',
 		'data-click-to-nvim="' ..
-			(M.config.instance_mode == "multi" and M.config.click_to_nvim and M._click_server and "true" or "false") .. '"',
-		'data-click-port="' .. (M._click_server and tostring(M._click_server.port) or "") .. '"',
+			(M.config.instance_mode == "multi" and M.config.click_to_nvim and "true" or "false") .. '"',
 	}, " ")
 	content = content:gsub('<html lang="en"', function()
 		return '<html lang="en" ' .. host_attrs
@@ -239,9 +236,8 @@ local function write_index_if_needed(dir)
 	-- network switch (which flips whether the token is baked at all) — a stale
 	-- non-empty token on a network bind would otherwise 401 every request.
 	local want = 'data-live-token="' .. (host_is_loopback() and (M._token or "") or "") .. '"'
-	local want_click = 'data-click-port="' .. (M._click_server and tostring(M._click_server.port) or "") .. '"'
 	local ok, existing = pcall(util.read_text, dst)
-	if not ok or not existing:find(want, 1, true) or not existing:find(want_click, 1, true) then
+	if not ok or not existing:find(want, 1, true) then
 		return write_index(dir)
 	end
 	return dst
@@ -390,7 +386,7 @@ local function maybe_refresh(bufnr, silent)
 	write_content(dir, text, bufnr)
 	M._last_text_by_buf[bufnr] = text
 
-	-- Notify live-server of the content change for immediate SSE push
+	-- Notify the embedded preview server of the content change.
 	-- In secondary takeover mode, M._server_instance is nil — fs_watch handles reload
 	if M._server_instance then
 		pcall(ls_server.reload, M._server_instance, M.config.content_name)
@@ -542,17 +538,6 @@ local function scroll_nvim_to_line(line)
 	end)
 end
 
-local function ensure_click_server()
-	if not M.config.click_to_nvim or M.config.instance_mode ~= "multi" then return end
-	if M._click_server then return end
-	local ok, instance = pcall(click.start, M.config.host, M._token, scroll_nvim_to_line)
-	if ok then
-		M._click_server = instance
-	else
-		vim.notify("Markdown Preview: click_to_nvim unavailable — " .. tostring(instance), vim.log.levels.WARN)
-	end
-end
-
 function M.start()
 	local bufnr = vim.api.nvim_get_current_buf()
 	M._active_bufnr = bufnr
@@ -616,7 +601,6 @@ function M.start()
 		M._token = ls_util.random_token(16)
 	end
 
-	ensure_click_server()
 	write_index_if_needed(dir)
 	write_content(dir, text, bufnr)
 	write_initial_scroll(dir, bufnr)
@@ -641,19 +625,7 @@ function M.start()
 		table.insert(protected, "^/" .. vim.pesc(M.config.index_name) .. "$")
 	end
 
-	-- Relative image support needs the asset route in live-server. The two
-	-- plugins are versioned independently, so warn (once) if the installed
-	-- live-server predates it — images will 404 until it's updated.
-	if not (ls_server.features and ls_server.features.asset_route) and not M._warned_no_asset_route then
-		M._warned_no_asset_route = true
-		vim.notify(
-			"Markdown Preview: relative images need a newer live-server.nvim (with the asset route).\n"
-				.. "Update live-server.nvim, or relative images will not load.",
-			vim.log.levels.WARN
-		)
-	end
-
-	-- Start live-server if not already running
+	-- Start the embedded preview server if not already running.
 	if not M._server_instance then
 		local port = effective_port()
 		local index_path = vim.fs.joinpath(dir, M.config.index_name)
@@ -683,6 +655,15 @@ function M.start()
 				local ok_read, data = pcall(util.read_text, vim.fs.joinpath(ws, "asset_root"))
 				if not ok_read or not data or data == "" then return nil end
 				return (data:gsub("%s+$", ""))
+			end,
+			on_event = function(event, data)
+				if event ~= "markdown-click" or M.config.instance_mode ~= "multi"
+					or not M.config.click_to_nvim then return end
+				local ok_decode, value = pcall(vim.json.decode, data)
+				if ok_decode and type(value) == "table" and type(value.line) == "number"
+					and value.line >= 0 and value.line % 1 == 0 then
+					scroll_nvim_to_line(value.line)
+				end
 			end,
 		})
 		if not ok then
@@ -760,8 +741,6 @@ function M.stop()
 		end
 		pcall(ls_server.stop, instance)
 	end
-	click.stop(M._click_server)
-	M._click_server = nil
 	if M._is_primary then
 		require("markdown_preview.lock").remove()
 	end
