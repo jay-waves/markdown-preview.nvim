@@ -64,8 +64,9 @@ function M.start(upstream, callbacks)
         if result.code ~= 0 then return callbacks.ready(result.stderr) end
         local origin = ("http://127.0.0.1:%d"):format(instance.port)
         local config = vim.json.encode({ upstream = upstream, origin = origin, token = token })
-        local injection = '<base href="' .. upstream .. '"><script>window.__typstBridge=' .. config
-            .. ';</script><script src="' .. origin .. '/typst-inject.js?t=' .. token .. '"></script>'
+        local injection = html_util.tag("base", { href = upstream })
+            .. html_util.tag("script", nil, "window.__typstBridge=" .. config .. ";")
+            .. html_util.tag("script", { src = origin .. "/typst-inject.js?t=" .. token }, "")
         local document, inserted = html_util.prepend_to(result.stdout, "head", injection)
         if not inserted then return callbacks.ready("Tinymist HTML has no head element") end
         self.html = document

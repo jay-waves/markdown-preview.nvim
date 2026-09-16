@@ -78,78 +78,36 @@ local session
 
 local function render_index(token)
 	local src = util.resolve_asset("index.html")
-	if not src then
-		error("Could not locate markdown_preview/assets/index.html")
-	end
-	local content = html.read(src)
-
-	-- Inline the shipped Markdown and syntax themes. Keeping them as separate
-	-- assets makes the preview shell independent from replaceable typography.
-	for placeholder, asset in pairs({
-		__MARKDOWN_THEME_CSS__ = "theme.css",
-		__HIGHLIGHT_THEME_CSS__ = "highlight.css",
-	}) do
-		local css_path = util.resolve_asset(asset)
-		if not css_path then
-			error("Could not locate " .. asset .. " in runtimepath")
-		end
-		local css = html.read(css_path)
-		content = html.render(content, { [placeholder] = css })
-	end
+	if not src then error("Could not locate markdown_preview/assets/index.html") end
 
 	local yaml_mode = M.config.yaml_mode
 	if yaml_mode == "panel" then yaml_mode = "code" end -- compatibility with older configs
 	if yaml_mode ~= "code" and yaml_mode ~= "hide" and yaml_mode ~= "raw" then yaml_mode = "code" end
-	content = html.render(content, {
-		["__MERMAID_ELK__"] = M.config.mermaid_elk and "true" or "false",
-		["<!-- __NVIM_ADAPTER__ -->"] = '<script src="https://cdn.jsdelivr.net/npm/morphdom@2/dist/morphdom-umd.min.js"></script>\n'
-			.. '<script src="nvim-preview.js"></script>',
-		["__THEME__"] = M.config.default_theme,
-		["__ALLOW_HTML__"] = M.config.allow_raw_html ~= false and "true" or "false",
-		["__YAML_MODE__"] = yaml_mode,
+	local custom_styles = html.styles(M.config.custom_css, {
+		on_error = function(index, value, resolved)
+			local detail = type(value) == "string" and " not readable: " .. resolved or " must be a file path"
+			vim.notify("Markdown Preview: custom_css[" .. index .. "]" .. detail, vim.log.levels.WARN)
+		end,
 	})
-
-	-- Host-only configuration is added to generated preview pages; the source
-	-- index remains a standalone renderer with no Neovim protocol attributes.
-	local host_attrs = table.concat({
-		'data-bottom-padding="' .. tostring(BOTTOM_PADDING) .. '"',
-		'data-live-token="' .. token .. '"',
-		'data-click-to-nvim="' .. (M.config.click_to_nvim and "true" or "false") .. '"',
-	}, " ")
-	content = content:gsub('<html lang="en"', function()
-		return '<html lang="en" ' .. host_attrs
-	end, 1)
-
-	-- Inline custom CSS after the bundled styles so user rules win the cascade.
-	-- A list keeps base theme and syntax highlighting files independent while
-	-- preserving their configured cascade order.
-	local custom_css = M.config.custom_css
-	local css_sources = type(custom_css) == "table" and custom_css or { custom_css }
-	local css_blocks = {}
-	for index, css_path in ipairs(css_sources) do
-		if type(css_path) == "string" then
-			if css_path ~= "" then
-				local css_src = vim.fn.expand(css_path)
-				local ok, css = pcall(html.read, css_src)
-				if ok and css then
-					css_blocks[#css_blocks + 1] = "<style>\n" .. css .. "\n</style>"
-				else
-					vim.notify("Markdown Preview: custom_css[" .. index .. "] not readable: " .. css_src,
-						vim.log.levels.WARN)
-				end
-			end
-		elseif css_path ~= nil then
-			vim.notify("Markdown Preview: custom_css[" .. index .. "] must be a file path",
-				vim.log.levels.WARN)
-		end
-	end
-	if #css_blocks > 0 then
-		local document, inserted = html.append_to(content, "head", table.concat(css_blocks, "\n") .. "\n")
-		if not inserted then error("Preview HTML has no head element") end
-		content = document
-	end
-
-	return content
+	return html.build({
+		template = src,
+		replacements = {
+			["__MARKDOWN_THEME_CSS__"] = { file = assert(util.resolve_asset("theme.css"), "Missing theme.css") },
+			["__HIGHLIGHT_THEME_CSS__"] = { file = assert(util.resolve_asset("highlight.css"), "Missing highlight.css") },
+			["__MERMAID_ELK__"] = M.config.mermaid_elk and "true" or "false",
+			["<!-- __NVIM_ADAPTER__ -->"] = '<script src="https://cdn.jsdelivr.net/npm/morphdom@2/dist/morphdom-umd.min.js"></script>\n'
+				.. '<script src="nvim-preview.js"></script>',
+			["__THEME__"] = M.config.default_theme,
+			["__ALLOW_HTML__"] = M.config.allow_raw_html ~= false and "true" or "false",
+			["__YAML_MODE__"] = yaml_mode,
+		},
+		attributes = { html = {
+			["data-bottom-padding"] = BOTTOM_PADDING,
+			["data-live-token"] = token,
+			["data-click-to-nvim"] = M.config.click_to_nvim and "true" or "false",
+		} },
+		append = custom_styles ~= "" and { head = custom_styles .. "\n" } or nil,
+	})
 end
 
 ---------------------------------------------------------------------------
