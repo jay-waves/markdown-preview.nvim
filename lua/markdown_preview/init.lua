@@ -22,8 +22,8 @@ M.config = {
 	-- On macOS, string values are passed via `open -a <name>`.
 	browser = nil,
 
-	-- Path or ordered list of paths to CSS files injected after the bundled
-	-- styles. Supports ~ and $VARS. "" or {} = disabled.
+	-- Path or ordered list of CSS files injected after the bundled styles.
+	-- Supports ~ and $VARS. "" or {} = disabled.
 	custom_css = "",
 
 	auto_refresh = true,
@@ -83,7 +83,7 @@ local function render_index(token)
 	if yaml_mode ~= "code" and yaml_mode ~= "hide" and yaml_mode ~= "raw" then yaml_mode = "code" end
 	local custom_styles = html.styles(M.config.custom_css, {
 		on_error = function(index, value, resolved)
-			local detail = type(value) == "string" and " not readable: " .. resolved or " must be a file path"
+			local detail = resolved and " not readable: " .. resolved or " must be a file path"
 			vim.notify("Markdown Preview: custom_css[" .. index .. "]" .. detail, vim.log.levels.WARN)
 		end,
 	})
@@ -317,6 +317,7 @@ function M.start()
 		s.token = s.token or session_runtime.token(16)
 		local index = render_index(s.token)
 		local ok, inst = pcall(session_runtime.start, {
+			token = s.token,
 			port = port,
 			host = M.config.host,
 			root = asset_dir,

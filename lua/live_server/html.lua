@@ -112,7 +112,7 @@ function M.styles(paths, options)
             elseif options.on_error then
                 options.on_error(index, path, resolved)
             end
-        elseif path ~= nil and options.on_error then
+        elseif path ~= nil and path ~= "" and options.on_error then
             options.on_error(index, path)
         end
     end

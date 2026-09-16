@@ -13,7 +13,7 @@
 
 :root,
 html[data-theme="light"] {
-  --md-fg: #1f2328;
+  --md-fg: #292929;
   --md-bg: #ffffff;
   --md-muted: #59636e;
   --md-border: #d1d9e0;
@@ -111,9 +111,9 @@ html[data-theme="dark"] {
 
 #content h1 {
   margin: .67em 0;
-  font-weight: 600;
+  font-weight: 500;
   padding-bottom: .3em;
-  font-size: 2em;
+  font-size: 1.6em;
   border-bottom: 1px solid var(--md-border-muted);
 }
 
@@ -314,35 +314,35 @@ html[data-theme="dark"] {
   font-family: var(--md-font-sans);
   margin-top: 1.5rem;
   margin-bottom: 1rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
 }
 
 #content h2 {
-  font-weight: 600;
+  font-weight: 500;
   padding-bottom: .3em;
-  font-size: 1.5em;
+  font-size: 1.25em;
   border-bottom: 1px solid var(--md-border-muted);
 }
 
 #content h3 {
-  font-weight: 600;
-  font-size: 1.25em;
+  font-weight: 500;
+  font-size: 1.1em;
 }
 
 #content h4 {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 1em;
 }
 
 #content h5 {
-  font-weight: 600;
-  font-size: .875em;
+  font-weight: 500;
+  font-size: 1em;
 }
 
 #content h6 {
-  font-weight: 600;
-  font-size: .85em;
+  font-weight: 500;
+  font-size: 1em;
   color: var(--md-muted);
 }
 

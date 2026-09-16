@@ -28,6 +28,8 @@ document compilations are not identified by file in that interface.
 
 Markdown options are configured through `markdown_preview.setup()`. Each module keeps its browser assets in its own `assets` directory under `lua/markdown_preview` or `lua/typst_preview`.
 
+Set `custom_css` to a CSS file path, or a list of paths, to add styles after the bundled theme. The default `""` uses only the bundled styles.
+
 Markdown preview uses one server and browser tab per Neovim instance. By default, entering another Markdown buffer retargets that preview to the current buffer.
 
 Markdown and Typst preview sessions belong to the Neovim instance, rather than
