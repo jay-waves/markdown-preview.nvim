@@ -131,12 +131,7 @@ end
 local CLIENT_JS = table.concat({
     "!function(){try{",
     "var es=new EventSource('/__live/events');",
-    "es.addEventListener('reload',function(e){",
-    "var d;try{d=JSON.parse(e.data)}catch(_){d={}}",
-    "if(d.css){var ls=document.querySelectorAll('link[rel=\"stylesheet\"]');",
-    "if(ls.length){ls.forEach(function(l){var h=l.href.replace(/[?&]_lr=\\d+/,'');",
-    "l.href=h+(h.indexOf('?')>-1?'&':'?')+'_lr='+Date.now()});return}}",
-    "location.reload()});",
+    "es.addEventListener('reload',function(){location.reload()});",
     "es.onopen=function(){console.log('[markdown-preview] connected')};",
     "es.onerror=function(e){console.warn('[markdown-preview] SSE error',e)};",
     "}catch(e){console.warn('[markdown-preview] no EventSource',e)}}();",
@@ -309,67 +304,6 @@ local function serve_html_file_with_injection(inst, sock, abs_path, extra_header
     send_html_with_injection(inst, sock, body, extra_headers)
 end
 
--- -------- Directory listing -----------------------------------------------
-
-local function dir_listing_html(inst, fs_path, req_path)
-    local entries = {}
-    local iter = uv.fs_scandir(fs_path)
-    if not iter then
-        return "<!doctype html><meta charset=utf-8><h2>Cannot read directory</h2>"
-    end
-    if req_path ~= "/" then
-        table.insert(entries, { name = "..", is_dir = true, up = true })
-    end
-    while true do
-        local name, t = uv.fs_scandir_next(iter)
-        if not name then break end
-        if not inst.dir_show_hidden and name:sub(1, 1) == "." then
-            -- skip hidden
-        else
-            table.insert(entries, { name = name, is_dir = (t == "directory") })
-        end
-    end
-    table.sort(entries, function(a, b)
-        if a.is_dir ~= b.is_dir then return a.is_dir end
-        return a.name:lower() < b.name:lower()
-    end)
-
-    local rows = {}
-    for _, e in ipairs(entries) do
-        local label = util.html_escape(e.name)
-        local href
-        if e.up then
-            local parent = req_path:gsub("/+$", ""):match("^(.*)/[^/]*$") or "/"
-            href = parent == "" and "/" or parent .. "/"
-        else
-            href = req_path ..
-            (req_path:sub(-1) == "/" and "" or "/") .. util.url_encode(e.name) .. (e.is_dir and "/" or "")
-        end
-        local icon = e.up and "⤴" or (e.is_dir and "📁" or "📄")
-        table.insert(rows, string.format(
-            '<tr><td class="ico">%s</td><td><a href="%s">%s</a></td></tr>',
-            icon, href, label
-        ))
-    end
-
-    local title = "Index of " .. util.html_escape(req_path)
-    local css = [[
-    <style>
-      :root{color-scheme:light dark}
-      body{font:14px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:24px;max-width:900px;margin:auto}
-      h1{font-size:20px;margin:0 0 16px}
-      table{width:100%;border-collapse:collapse}
-      td{padding:6px 8px;border-bottom:1px solid rgba(127,127,127,.2)}
-      td.ico{width:2rem;text-align:center}
-      a{text-decoration:none} a:hover{text-decoration:underline}
-    </style>
-  ]]
-    return string.format([[
-  <!doctype html><html><head><meta charset="utf-8"><title>%s</title>%s</head>
-  <body><h1>%s</h1><table>%s</table></body></html>
-  ]], util.html_escape(title), css, util.html_escape(title), table.concat(rows))
-end
-
 -- -------- Static file streaming -------------------------------------------
 
 local function stream_file(sock, abs_path, extra_headers)
@@ -455,13 +389,9 @@ function S.start(cfg)
         live_enabled     = cfg.live and cfg.live.enabled ~= false,
         inject_script    = cfg.live and cfg.live.inject_script ~= false,
         live_debounce    = (cfg.live and cfg.live.debounce) or 120,
-        css_inject       = cfg.live and cfg.live.css_inject ~= false,
         sse_clients      = {},
         debounce_timer   = uv.new_timer(),
 
-        -- features
-        dir_enabled      = not (cfg.features and cfg.features.dirlist and cfg.features.dirlist.enabled == false),
-        dir_show_hidden  = cfg.features and cfg.features.dirlist and cfg.features.dirlist.show_hidden or false,
         index_names      = cfg.index_names or { "index.html", "index.htm" },
         ignore_patterns  = util.parse_liveignore(root_real),
         notify_on_reload = cfg.notify_on_reload or false,
@@ -629,12 +559,7 @@ function S.start(cfg)
                     if candidate and uv.fs_stat(candidate) then
                         return serve_path(inst, sock, candidate, req.path, inst.headers)
                     end
-                    if inst.dir_enabled then
-                        local html = dir_listing_html(inst, mapped, req.path)
-                        return send_html_with_injection(inst, sock, html, inst.headers)
-                    else
-                        return http_404(sock, req.path .. " (no index)")
-                    end
+                    return http_404(sock, req.path .. " (no index)")
                 elseif st and st.type == "file" then
                     return serve_path(inst, sock, mapped, req.path, inst.headers)
                 else
@@ -670,12 +595,11 @@ end
 -- Live-reload controls
 function S.reload(inst, reason_path)
     local rp = tostring(reason_path or "")
-    local is_css = inst.css_inject and rp:match("%.css$")
-    local payload = ('{"ts":%d,"path":%q,"css":%s}'):format(os.time(), rp, is_css and "true" or "false")
+    local payload = ('{"ts":%d,"path":%q}'):format(os.time(), rp)
     sse_broadcast(inst, "reload", payload)
     if inst.notify_on_reload then
         vim.schedule(function()
-            util.notify(("Reload%s → %s"):format(is_css and " (CSS)" or "", rp ~= "" and rp or "manual"),
+            util.notify(("Reload → %s"):format(rp ~= "" and rp or "manual"),
                 { notify = true })
         end)
     end

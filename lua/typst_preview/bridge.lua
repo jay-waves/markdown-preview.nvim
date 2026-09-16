@@ -13,7 +13,6 @@ function M.start(upstream, callbacks)
         host = "127.0.0.1", port = 0, root = root,
         headers = { ["Cache-Control"] = "no-store", ["Referrer-Policy"] = "no-referrer" },
         live = { enabled = false, inject_script = false },
-        features = { dirlist = { enabled = false } },
         token = token,
         protected_paths = { "^/typst%-inject%.js$" },
         routes = {

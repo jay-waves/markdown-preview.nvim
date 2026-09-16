@@ -385,7 +385,6 @@ function M.start()
 			root = asset_dir,
 			headers = { ["Cache-Control"] = "no-cache" },
 			live = { enabled = false, inject_script = false },
-			features = { dirlist = { enabled = false } },
 			token = s.token,
 			routes = {
 				["/"] = function()
