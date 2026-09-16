@@ -22,9 +22,10 @@ html[data-theme="light"] {
   --md-alert-important: #8250df;
   --md-alert-warning: #9a6700;
   --md-alert-tip: #1a7f37;
-  --md-font-serif: "Noto Sans", "Noto Sans CJK SC", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --md-font-serif: "Noto Serif", "Noto Serif CJK SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
   --md-font-sans: "Noto Sans", "Noto Sans CJK SC", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --md-font: var(--md-font-sans);
+  --md-font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --md-font: var(--md-font-serif);
   color-scheme: light;
 }
 
@@ -144,7 +145,7 @@ html[data-theme="dark"] {
 #content kbd,
 #content pre,
 #content samp {
-  font-family: "Fira Code", monospace;
+  font-family: var(--md-font-mono);
   font-weight: 400;
   font-size: 12px;
 }
@@ -377,7 +378,7 @@ html[data-theme="dark"] {
 #content tt,
 #content code,
 #content samp {
-  font-family: "Fira Code", monospace;
+  font-family: var(--md-font-mono);
   font-weight: 400;
   font-size: 12px;
 }
@@ -385,7 +386,7 @@ html[data-theme="dark"] {
 #content pre {
   margin-top: 0;
   margin-bottom: 0;
-  font-family: "Fira Code", monospace;
+  font-family: var(--md-font-mono);
   font-weight: 400;
   font-size: 12px;
   word-wrap: normal;
@@ -586,7 +587,7 @@ html[data-theme="dark"] {
   padding: 1rem;
   overflow: auto;
   font-size: 12px;
-  font-family: "Fira Code", monospace;
+  font-family: var(--md-font-mono);
   line-height: 1.45;
   border-radius: 6px;
 }
@@ -599,7 +600,7 @@ html[data-theme="dark"] {
   padding: 0;
   margin: 0;
   overflow: visible;
-  font-family: "Fira Code", monospace;
+  font-family: var(--md-font-mono);
   font-size: 12px;
   line-height: inherit;
   word-wrap: normal;
