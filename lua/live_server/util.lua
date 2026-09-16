@@ -47,8 +47,7 @@ function M.path_has_prefix(path, prefix)
 end
 
 function M.html_escape(value)
-    local entities = { ["&"] = "&amp;", ["<"] = "&lt;", [">"] = "&gt;", ['"'] = "&quot;", ["'"] = "&#39;" }
-    return (tostring(value):gsub("[&<>\"']", entities))
+    return require("live_server.html").escape(value)
 end
 
 function M.parse_liveignore(root)

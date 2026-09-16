@@ -1,5 +1,7 @@
 local M = {}
 local server = require("live_server.server")
+local browser = require("live_server.browser")
+local html_util = require("live_server.html")
 local source_dir = vim.fs.dirname(debug.getinfo(1, "S").source:sub(2))
 local root = vim.fs.joinpath(source_dir, "assets")
 
@@ -29,13 +31,18 @@ function M.start(upstream, callbacks)
     function self:connected()
         return server.connected_client_count(instance) > 0
     end
-    function self:title(value)
-        server.send_event(instance, "typst-title", vim.json.encode(value))
+    function self:prepared()
+        return self.html ~= nil
+    end
+    function self:buffer(value)
+        server.send_event(instance, "typst-buffer", vim.json.encode(value))
+    end
+    function self:follow()
+        server.send_event(instance, "typst-follow", "{}")
     end
     function self:open()
         if self.stopped or not self.html or self:connected() then return end
-        local _, err = vim.ui.open(self.url)
-        if err then vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Typst Preview" }) end
+        browser.open(self.url, nil, { title = "Typst Preview" })
     end
     function self:stop(exiting)
         if self.stopped then return end
@@ -60,11 +67,9 @@ function M.start(upstream, callbacks)
         local config = vim.json.encode({ upstream = upstream, origin = origin, token = token })
         local injection = '<base href="' .. upstream .. '"><script>window.__typstBridge=' .. config
             .. ';</script><script src="' .. origin .. '/typst-inject.js?t=' .. token .. '"></script>'
-        local html, count = result.stdout:gsub("(<[hH][eE][aA][dD][^>]*>)", function(head)
-            return head .. injection
-        end, 1)
-        if count ~= 1 then return callbacks.ready("Tinymist HTML has no head element") end
-        self.html = html
+        local document, inserted = html_util.prepend_to(result.stdout, "head", injection)
+        if not inserted then return callbacks.ready("Tinymist HTML has no head element") end
+        self.html = document
         callbacks.ready()
     end))
     return self

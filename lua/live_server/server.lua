@@ -1,5 +1,6 @@
 local uv   = vim.loop
 local util = require("live_server.util")
+local html_util = require("live_server.html")
 
 local S    = {}
 
@@ -294,11 +295,8 @@ end
 local function send_html_with_injection(inst, sock, html, extra_headers)
     if inst.inject_script then
         local tag = '<script src="/__live/script.js"></script>'
-        if html:find("</body>", 1, true) then
-            html = html:gsub("</body>", tag .. "</body>", 1)
-        else
-            html = html .. tag
-        end
+        local document, inserted = html_util.append_to(html, "body", tag)
+        html = inserted and document or (html .. tag)
     end
     local headers = { ["Content-Type"] = "text/html; charset=utf-8" }
     for k, v in pairs(extra_headers or {}) do headers[k] = v end

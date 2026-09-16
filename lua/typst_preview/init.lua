@@ -1,6 +1,5 @@
 local M = {}
 local bridge = require("typst_preview.bridge")
-local task_id = "nvim_browsing_preview"
 local session, exiting, configured
 
 local function notify(message)
@@ -26,26 +25,19 @@ local function release(s)
     if session == s then session = nil end
 end
 
-local function kill(s)
-    if s.killing then return end
-    s.stopping, s.killing = true, true
-    close_page(s)
-    if s.client:is_stopped() then return release(s) end
-    s.client:exec_cmd({
-        title = "Stop Tinymist Preview", command = "tinymist.doKillPreview",
-        arguments = { task_id },
-    }, {}, function(err)
-        if err then notify(vim.inspect(err)) end
-        release(s)
-    end)
+local function stop_task(s)
+    local stop = s.stop_task
+    if not stop then return end
+    s.stop_task = nil
+    stop()
 end
 
 function M.stop()
     local s = session
-    if not s or s.stopping then return end
-    s.stopping = true
-    cancel_scroll(s)
-    if s.task_started then kill(s) end
+    if not s then return end
+    session = nil
+    close_page(s)
+    stop_task(s)
 end
 
 local function focus(client, bufnr)
@@ -57,10 +49,10 @@ end
 
 local function schedule_scroll(s)
     cancel_scroll(s)
-    if session ~= s or not s.ready or s.stopping then return end
+    if session ~= s or not s.page or not s.page:prepared() then return end
     local timer
     timer = vim.defer_fn(function()
-        if session ~= s or s.timer ~= timer or s.stopping then return end
+        if session ~= s or s.timer ~= timer then return end
         s.timer = nil
         if s.client:is_stopped() or current_client() ~= s.client then return end
         local bufnr = vim.api.nvim_get_current_buf()
@@ -71,7 +63,7 @@ local function schedule_scroll(s)
         if col < 0 then return end
         s.client:exec_cmd({
             title = "Follow Cursor in Tinymist Preview", command = "tinymist.scrollPreview",
-            arguments = { task_id, {
+            arguments = { s.task_id, {
                 event = "panelScrollTo", filepath = vim.api.nvim_buf_get_name(bufnr),
                 line = row - 1, character = col,
             } },
@@ -83,9 +75,11 @@ local function schedule_scroll(s)
 end
 
 local function sync_page(s, bufnr)
-    if session ~= s or not s.page or s.stopping then return end
+    if session ~= s or not s.page or not s.page:prepared() then return end
     local name = vim.api.nvim_buf_get_name(bufnr)
-    s.page:title(name ~= "" and vim.fn.fnamemodify(name, ":t") or "Typst Preview")
+    s.cursor = vim.api.nvim_win_get_cursor(0)
+    s.page:buffer({ id = vim.uri_from_bufnr(bufnr), title = name ~= "" and vim.fn.fnamemodify(name, ":t") or "Typst Preview" })
+    focus(s.client, bufnr)
     schedule_scroll(s)
 end
 
@@ -95,61 +89,73 @@ function M.start()
     if not client then return notify("Tinymist is not attached to the current buffer") end
     local bufnr = vim.api.nvim_get_current_buf()
     if session then
-        if session.stopping then return notify("Preview is stopping; retry shortly") end
         if session.client ~= client then return notify("Stop the existing preview before changing workspace") end
-        if session.ready then
-            focus(client, bufnr)
+        if session.page and session.page:prepared() then
             sync_page(session, bufnr)
             session.page:open()
         end
         return
     end
 
-    local s = { client = client }
+    local s = {
+        client = client,
+        task_id = ("nvim_browsing_preview_%x"):format(vim.uv.hrtime()),
+    }
     session = s
     focus(client, bufnr)
     client:exec_cmd({
         title = "Start Tinymist Preview", command = "tinymist.doStartBrowsingPreview",
         arguments = { {
             "--data-plane-host=127.0.0.1:0", "--invert-colors=auto",
-            "--no-open", "--task-id=" .. task_id,
+            "--no-open", "--task-id=" .. s.task_id,
         } },
     }, { bufnr = bufnr }, function(err, result)
         if err then release(s); return notify(vim.inspect(err)) end
-        s.task_started = true
-        if session ~= s or exiting or s.stopping then return kill(s) end
+        s.stop_task = function()
+            if client:is_stopped() then return end
+            client:exec_cmd({
+                title = "Stop Tinymist Preview", command = "tinymist.doKillPreview",
+                arguments = { s.task_id },
+            }, {}, function(kill_err)
+                if kill_err then notify(vim.inspect(kill_err)) end
+                if client:is_stopped() or (session and session.client == client) then return end
+                client:exec_cmd({
+                    title = "Clear Tinymist Cache", command = "tinymist.doClearCache",
+                    arguments = {},
+                }, {}, function(clear_err)
+                    if clear_err then notify(vim.inspect(clear_err)) end
+                end)
+            end)
+        end
+        if session ~= s or exiting then return stop_task(s) end
         local port = type(result) == "table" and (result.staticServerPort or result.dataPlanePort)
         if type(port) ~= "number" then
-            kill(s)
+            M.stop()
             return notify("Tinymist returned no preview port: " .. vim.inspect(result))
         end
         local ok, page = pcall(bridge.start, ("http://127.0.0.1:%d/"):format(port), {
-            connected = function() sync_page(s, vim.api.nvim_get_current_buf()) end,
+            connected = function()
+                if current_client() == s.client then sync_page(s, vim.api.nvim_get_current_buf()) end
+            end,
             ready = function(prepare_err)
-                if session ~= s or s.stopping then return end
-                if prepare_err then kill(s); return notify("Preview injection failed: " .. prepare_err) end
-                s.ready = true
+                if session ~= s then return end
+                if prepare_err then M.stop(); return notify("Preview injection failed: " .. prepare_err) end
                 if current_client() == client then
-                    local current_buf = vim.api.nvim_get_current_buf()
-                    focus(client, current_buf)
-                    sync_page(s, current_buf)
+                    sync_page(s, vim.api.nvim_get_current_buf())
                 end
                 s.page:open()
             end,
         })
-        if not ok then kill(s); return notify(tostring(page)) end
+        if not ok then M.stop(); return notify(tostring(page)) end
         s.page = page
     end)
 end
 
 function M.on_dispose(_, result, ctx)
     local s = session
-    if not s or not result or result.taskId ~= task_id or ctx.client_id ~= s.client.id then return end
-    if s.task_started then
-        if not s.stopping then release(s) end
-    else
-        s.stopping = true
-    end
+    if not s or not result or result.taskId ~= s.task_id or ctx.client_id ~= s.client.id then return end
+    s.stop_task = nil
+    release(s)
 end
 
 function M.setup()
@@ -158,17 +164,23 @@ function M.setup()
     vim.api.nvim_create_user_command("TypstPreview", M.start, { desc = "Start or reopen Typst preview" })
     vim.api.nvim_create_user_command("TypstPreviewStop", M.stop, { desc = "Stop Typst preview" })
     local group = vim.api.nvim_create_augroup("TypstPreview", { clear = true })
-    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter", "CursorMoved", "InsertLeave", "BufLeave", "WinLeave" }, {
+    vim.api.nvim_create_autocmd({ "BufEnter", "CursorMoved", "InsertLeave", "BufLeave" }, {
         group = group, pattern = "*.typ",
         callback = function(args)
             local s = session
             if not s then return end
-            if args.event == "BufLeave" or args.event == "WinLeave" then return cancel_scroll(s) end
-            if args.event ~= "BufEnter" then return schedule_scroll(s) end
+            if args.event == "BufLeave" then return cancel_scroll(s) end
+            if args.event ~= "BufEnter" then
+                local cursor = vim.api.nvim_win_get_cursor(0)
+                if vim.deep_equal(cursor, s.cursor) then return end
+                s.cursor = cursor
+                if s.page then s.page:follow() end
+                return schedule_scroll(s)
+            end
             vim.schedule(function()
                 if session ~= s or vim.api.nvim_get_current_buf() ~= args.buf then return end
                 local client = current_client()
-                if client == s.client then focus(client, args.buf); sync_page(s, args.buf) end
+                if client == s.client then sync_page(s, args.buf) end
             end)
         end,
     })
@@ -178,9 +190,7 @@ function M.setup()
             local s = session
             if not s or s.client.id ~= args.data.client_id then return end
             vim.schedule(function()
-                if session == s and (s.client:is_stopped() or vim.tbl_isempty(s.client.attached_buffers)) then
-                    M.stop()
-                end
+                if session == s and s.client:is_stopped() then release(s) end
             end)
         end,
     })

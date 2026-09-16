@@ -471,7 +471,7 @@
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/texmath.js"></script>
 
     <script type="module">
-        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        import { createMermaidPreview } from './mermaid.js';
         import markdownItGithubAlerts from 'https://unpkg.com/markdown-it-github-alerts@1.0.1/dist/index.mjs';
 
         // ── DOM refs ──────────────────────────────────────────────────
@@ -490,12 +490,68 @@
         const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const followsSystemTheme = document.documentElement.dataset.themeMode === 'auto';
         let currentTheme = document.documentElement.dataset.theme || 'dark';
-        let mermaidIdCounter = 0;
-        const loadedPacks = new Set();
+        let overlaySource = null;
+        let overlayFilename = 'image';
+        let overlayPanzoomInstance = null;
 
-        // Overlay state
-        let ovSvgSource = '';
-        let ovPanzoom = null;
+        function openOverlay({ html, src, filename }) {
+            overlayFilename = filename || 'image';
+            overlaySource = html || src || null;
+            if (html) overlayPanzoomInner.innerHTML = html;
+            else {
+                const image = document.createElement('img');
+                image.src = src;
+                image.alt = '';
+                overlayPanzoomInner.replaceChildren(image);
+            }
+            if (!overlay.open) overlay.showModal();
+            const target = overlayPanzoomInner.querySelector('svg, img');
+            if (target && window.Panzoom) {
+                overlayPanzoomInstance = window.Panzoom(target, {
+                    canvas: true, pinchAndPan: true, minScale: 0.1, maxScale: 8,
+                });
+            }
+        }
+
+        overlay.addEventListener('close', () => {
+            if (overlayPanzoomInstance) overlayPanzoomInstance.destroy();
+            overlayPanzoomInstance = null;
+            overlayPanzoomInner.replaceChildren();
+            overlaySource = null;
+        });
+        overlayPanzoom.addEventListener('wheel', event => {
+            if (!overlayPanzoomInstance) return;
+            event.preventDefault();
+            if (event.ctrlKey) return overlayPanzoomInstance.zoomWithWheel(event);
+            const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? overlayPanzoom.clientHeight : 1;
+            const scale = overlayPanzoomInstance.getScale();
+            const pan = overlayPanzoomInstance.getPan();
+            overlayPanzoomInstance.pan(pan.x - event.deltaX * unit / scale, pan.y - event.deltaY * unit / scale);
+        }, { passive: false });
+        ovClose.addEventListener('click', () => overlay.close());
+        ovExport.addEventListener('click', () => {
+            if (!overlaySource) return;
+            const anchor = document.createElement('a');
+            if (overlaySource.trim().startsWith('<')) {
+                anchor.href = URL.createObjectURL(new Blob([overlaySource], { type: 'image/svg+xml' }));
+                setTimeout(() => URL.revokeObjectURL(anchor.href), 2000);
+            } else {
+                anchor.href = overlaySource;
+            }
+            anchor.download = overlayFilename;
+            anchor.click();
+        });
+        contentEl.addEventListener('click', event => {
+            if (event.target.closest('[data-expand]')) return;
+            const image = event.target.closest('img');
+            if (!image?.src) return;
+            openOverlay({ src: image.src, filename: image.alt || image.src.split('/').pop() || 'image' });
+        });
+
+        const mermaidPreview = createMermaidPreview({
+            contentElement: contentEl,
+            openOverlay,
+        });
 
         function showContent() {
             if (loadingSkeleton) loadingSkeleton.style.display = 'none';
@@ -506,17 +562,13 @@
         function applyTheme(theme) {
             currentTheme = theme;
             document.documentElement.setAttribute('data-theme', theme);
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: theme === 'dark' ? 'dark' : 'default',
-                securityLevel: 'strict',
-            });
+            mermaidPreview.setTheme(theme);
         }
 
         systemThemeQuery.addEventListener('change', (event) => {
             if (!followsSystemTheme) return;
             applyTheme(event.matches ? 'dark' : 'light');
-            renderAllMermaidBlocks(true);
+            mermaidPreview.render(true);
         });
 
         // ── Markdown-it setup ─────────────────────────────────────────
@@ -665,157 +717,6 @@
             return `<div class="code-wrap">${html}${languageLabel}</div>`;
         };
 
-        // ── Iconify auto-detection ────────────────────────────────────
-        function detectPacks(src) {
-            const re = /\b([a-z0-9-]+):[a-z0-9-]+\b/gi;
-            const s = new Set();
-            let m;
-            while ((m = re.exec(src))) s.add(m[1].toLowerCase());
-            return [...s];
-        }
-
-        async function ensurePack(name) {
-            if (loadedPacks.has(name)) return;
-            try {
-                const loader = () => fetch(`https://unpkg.com/@iconify-json/${name}@1/icons.json`).then(r => r.json());
-                await mermaid.registerIconPacks([{ name, loader }]);
-                loadedPacks.add(name);
-            } catch (_) { }
-        }
-
-        // ── Mermaid rendering ─────────────────────────────────────────
-        const lastGoodSvg = {};
-
-        function removeMermaidErrorArtifacts(block) {
-            block.querySelectorAll('.error,.error-icon,.error-text,.errorText').forEach(node => node.remove());
-        }
-
-        async function renderMermaidBlock(block) {
-            const source = decodeURIComponent(block.dataset.mermaidSource || '');
-            if (!source.trim()) return;
-
-            const wrap = block.querySelector('.mermaid-svg-wrap');
-            if (!wrap) return;
-
-            const packs = detectPacks(source);
-            for (const p of packs) await ensurePack(p);
-
-            try {
-                mermaidIdCounter++;
-                const id = 'mmd-render-' + mermaidIdCounter;
-                const { svg } = await mermaid.render(id, source);
-
-                wrap.innerHTML = svg;
-                block.classList.add('mermaid-rendered');
-                block.classList.remove('mermaid-errored');
-                lastGoodSvg[block.id] = svg;
-
-                removeMermaidErrorArtifacts(block);
-            } catch (e) {
-                block.classList.add('mermaid-errored');
-                const fallback = lastGoodSvg[block.id];
-                if (fallback) {
-                    wrap.innerHTML = fallback;
-                }
-                let errEl = block.querySelector('.mermaid-error');
-                if (!errEl) {
-                    errEl = document.createElement('div');
-                    errEl.className = 'mermaid-error';
-                    block.appendChild(errEl);
-                }
-                const msg = String(e?.message || e || 'Invalid diagram')
-                    .split('\n').find(Boolean) || 'Invalid diagram';
-                errEl.textContent = msg.replace(/\s*mermaid version\s*\d+(?:\.\d+)*\s*$/i, '').trim();
-
-                removeMermaidErrorArtifacts(block);
-            }
-        }
-
-        async function renderAllMermaidBlocks(force = false) {
-            const selector = '.mermaid-block[data-mermaid-source]' + (force ? '' : ':not(.mermaid-rendered)');
-            const blocks = contentEl.querySelectorAll(selector);
-            for (const block of blocks) {
-                await renderMermaidBlock(block);
-            }
-        }
-
-        // ── Expand overlay (fullscreen diagram zoom/pan) ──────────────
-        function openOverlay(svgHtml) {
-            ovSvgSource = svgHtml;
-            overlayPanzoomInner.innerHTML = svgHtml;
-            if (!overlay.open) overlay.showModal();
-
-            const svg = overlayPanzoomInner.querySelector('svg');
-            if (svg && window.Panzoom) {
-                ovPanzoom = window.Panzoom(svg, {
-                    canvas: true,
-                    pinchAndPan: true,
-                    minScale: 0.1,
-                    maxScale: 8,
-                });
-            } else if (svg) {
-                console.error('[markdown-preview] Panzoom failed to load');
-            }
-        }
-
-        function closeOverlay() {
-            if (overlay.open) overlay.close();
-        }
-
-        overlay.addEventListener('close', () => {
-            if (ovPanzoom) ovPanzoom.destroy();
-            ovPanzoom = null;
-            overlayPanzoomInner.replaceChildren();
-            ovSvgSource = '';
-        });
-
-        // Trackpad scrolling is a wheel event; trackpad pinch is reported as
-        // ctrl+wheel. Keep those gestures distinct instead of zooming both.
-        overlayPanzoom.addEventListener('wheel', (e) => {
-            if (!ovPanzoom) return;
-            e.preventDefault();
-            if (e.ctrlKey) {
-                ovPanzoom.zoomWithWheel(e);
-                return;
-            }
-            const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? overlayPanzoom.clientHeight : 1;
-            const scale = ovPanzoom.getScale();
-            const pan = ovPanzoom.getPan();
-            ovPanzoom.pan(
-                pan.x - e.deltaX * unit / scale,
-                pan.y - e.deltaY * unit / scale
-            );
-        }, { passive: false });
-
-        // Export SVG from overlay
-        ovExport.addEventListener('click', () => {
-            if (!ovSvgSource) return;
-            const blob = new Blob([ovSvgSource], { type: 'image/svg+xml' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'diagram.svg';
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-        });
-
-        // Close overlay
-        ovClose.addEventListener('click', closeOverlay);
-
-        // ── Delegated content actions ─────────────────────────────────
-        contentEl.addEventListener('click', async (e) => {
-            const expandBtn = e.target.closest('[data-expand]');
-            if (expandBtn) {
-                const blockId = expandBtn.dataset.expand;
-                const block = document.getElementById(blockId);
-                if (!block) return;
-                const wrap = block.querySelector('.mermaid-svg-wrap');
-                if (!wrap) return;
-                const svg = wrap.innerHTML;
-                if (svg) openOverlay(svg);
-                return;
-            }
-        });
-
         // ── Public renderer API ───────────────────────────────────────
         const core = {
             contentElement: contentEl,
@@ -823,7 +724,7 @@
                 return sanitizeRenderedHtml(md.render(markdown));
             },
             async renderMermaid(force = false) {
-                await renderAllMermaidBlocks(force);
+                await mermaidPreview.render(force);
             },
             async render(markdown) {
                 contentEl.innerHTML = this.renderToHtml(markdown);
@@ -839,10 +740,7 @@
         // Neovim live-preview protocol, attach through the ready event below.
         (async function boot() {
             try {
-                if (document.documentElement.dataset.mermaidElk === 'true') {
-                    const elkLayouts = await import('https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.2.1/dist/mermaid-layout-elk.esm.min.mjs');
-                    mermaid.registerLayoutLoaders(elkLayouts.default || elkLayouts);
-                }
+                await mermaidPreview.setup(document.documentElement.dataset.mermaidElk === 'true');
                 applyTheme(currentTheme);
             } catch (e) {
                 console.error('[markdown-preview] boot error:', e);

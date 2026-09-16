@@ -1,10 +1,18 @@
 -- lua/markdown_preview/init.lua
-local ts = require("markdown_preview.ts")
 local util = require("markdown_preview.util")
 local ls_server = require("live_server.server")
 local ls_util = require("live_server.util")
+local browser = require("live_server.browser")
+local html = require("live_server.html")
 
 local M = {}
+local AUTO_REFRESH_EVENTS = { "TextChanged", "TextChangedI", "BufWritePost" }
+local BOTTOM_PADDING = 0.5
+
+local function supported_file(bufnr)
+	local name = vim.api.nvim_buf_get_name(bufnr):lower()
+	return name:match("%.md$") ~= nil or name:match("%.mmd$") ~= nil
+end
 
 M.config = {
 	port = 0, -- 0 = auto
@@ -21,7 +29,6 @@ M.config = {
 	custom_css = "",
 
 	auto_refresh = true,
-	auto_refresh_events = { "TextChanged", "TextChangedI", "BufWritePost" },
 	debounce_ms = 300,
 
 	-- After the first :MarkdownPreview, reuse the same server and browser tab
@@ -32,9 +39,8 @@ M.config = {
 	-- Enables %%{init: {"layout": "elk"}}%% in diagrams.
 	mermaid_elk = false,
 
-	-- Scroll to the current Markdown line once when opening/retargeting the
-	-- preview. Unlike scroll_sync, later cursor movement is not followed.
-	initial_scroll = true,
+	-- Opening or retargeting always scrolls to the current Markdown line.
+	-- Later cursor movement is followed only when scroll_sync is enabled.
 	scroll_sync = false, -- sync browser scroll to cursor position
 	click_to_nvim = true, -- click a rendered block to scroll Neovim to its source
 
@@ -51,10 +57,6 @@ M.config = {
 	-- "raw"   = leave it in the document (renders as markdown)
 	yaml_mode = "code",
 
-	-- Fraction (0–1): vertical position of the final line when scrolled to end.
-	-- 0.5 = middle of viewport (default), 1.0 = bottom edge (no extra space)
-	bottom_padding = 0.5,
-
 	hooks = {
 		-- fun(url: string)|nil — called after preview starts; receives the preview URL
 		on_start = nil,
@@ -65,7 +67,6 @@ M.config = {
 
 function M.setup(opts)
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
-	M.config.bottom_padding = math.max(0, math.min(1, M.config.bottom_padding))
 end
 
 -- One private session owns the server, document, and callbacks.
@@ -80,7 +81,7 @@ local function render_index(token)
 	if not src then
 		error("Could not locate markdown_preview/assets/index.html")
 	end
-	local content = util.read_text(src)
+	local content = html.read(src)
 
 	-- Inline the shipped Markdown and syntax themes. Keeping them as separate
 	-- assets makes the preview shell independent from replaceable typography.
@@ -92,32 +93,26 @@ local function render_index(token)
 		if not css_path then
 			error("Could not locate " .. asset .. " in runtimepath")
 		end
-		local css = util.read_text(css_path)
-		content = content:gsub(placeholder, function() return css end)
+		local css = html.read(css_path)
+		content = html.render(content, { [placeholder] = css })
 	end
 
-	-- gsub with function replacement: avoids the "%n is a capture reference"
-	-- escape problem if any substituted value contains '%'.
-	content = content:gsub("__MERMAID_ELK__", function() return M.config.mermaid_elk and "true" or "false" end)
-	content = content:gsub("<!%-%- __NVIM_ADAPTER__ %-%->", function()
-		return '<script src="https://cdn.jsdelivr.net/npm/morphdom@2/dist/morphdom-umd.min.js"></script>\n'
-			.. '<script src="nvim-preview.js"></script>'
-	end)
-	content = content:gsub("__THEME__", function() return M.config.default_theme end)
-	content = content:gsub("__ALLOW_HTML__", function()
-		return M.config.allow_raw_html ~= false and "true" or "false"
-	end)
-	content = content:gsub("__YAML_MODE__", function()
-		local m = M.config.yaml_mode
-		if m == "panel" then m = "code" end -- compatibility with older configs
-		if m ~= "code" and m ~= "hide" and m ~= "raw" then m = "code" end
-		return m
-	end)
+	local yaml_mode = M.config.yaml_mode
+	if yaml_mode == "panel" then yaml_mode = "code" end -- compatibility with older configs
+	if yaml_mode ~= "code" and yaml_mode ~= "hide" and yaml_mode ~= "raw" then yaml_mode = "code" end
+	content = html.render(content, {
+		["__MERMAID_ELK__"] = M.config.mermaid_elk and "true" or "false",
+		["<!-- __NVIM_ADAPTER__ -->"] = '<script src="https://cdn.jsdelivr.net/npm/morphdom@2/dist/morphdom-umd.min.js"></script>\n'
+			.. '<script src="nvim-preview.js"></script>',
+		["__THEME__"] = M.config.default_theme,
+		["__ALLOW_HTML__"] = M.config.allow_raw_html ~= false and "true" or "false",
+		["__YAML_MODE__"] = yaml_mode,
+	})
 
 	-- Host-only configuration is added to generated preview pages; the source
 	-- index remains a standalone renderer with no Neovim protocol attributes.
 	local host_attrs = table.concat({
-		'data-bottom-padding="' .. tostring(M.config.bottom_padding) .. '"',
+		'data-bottom-padding="' .. tostring(BOTTOM_PADDING) .. '"',
 		'data-live-token="' .. token .. '"',
 		'data-click-to-nvim="' .. (M.config.click_to_nvim and "true" or "false") .. '"',
 	}, " ")
@@ -135,7 +130,7 @@ local function render_index(token)
 		if type(css_path) == "string" then
 			if css_path ~= "" then
 				local css_src = vim.fn.expand(css_path)
-				local ok, css = pcall(util.read_text, css_src)
+				local ok, css = pcall(html.read, css_src)
 				if ok and css then
 					css_blocks[#css_blocks + 1] = "<style>\n" .. css .. "\n</style>"
 				else
@@ -149,49 +144,31 @@ local function render_index(token)
 		end
 	end
 	if #css_blocks > 0 then
-		content = content:gsub("</head>", function()
-			return table.concat(css_blocks, "\n") .. "\n</head>"
-		end, 1)
+		local document, inserted = html.append_to(content, "head", table.concat(css_blocks, "\n") .. "\n")
+		if not inserted then error("Preview HTML has no head element") end
+		content = document
 	end
 
 	return content
 end
 
 ---------------------------------------------------------------------------
--- Content writing (unified: markdown or mermaid)
+-- Content writing (.md or .mmd)
 ---------------------------------------------------------------------------
 
-local function extract_mermaid_under_cursor(bufnr)
-	local ok, text = pcall(ts.extract_under_cursor, bufnr)
-	if ok and text and text ~= "" then return text end
-	local fallback = ts.fallback_scan(bufnr)
-	if not fallback or #fallback == 0 then
-		error("No ```mermaid fenced code block found under (or above) the cursor")
-	end
-	return fallback
-end
-
----Get the content to write based on filetype.
----Markdown buffers: entire buffer.
----Mermaid files (.mmd, .mermaid): entire buffer wrapped in mermaid fence.
----Others: mermaid block under cursor wrapped in fence.
+---Get the full content of a Markdown or Mermaid file.
 ---@param bufnr integer
 ---@return string
 local function get_content(bufnr)
 	local text
-	local ft = vim.bo[bufnr].filetype
-	local name = vim.api.nvim_buf_get_name(bufnr)
-	if ft == "markdown" then
-		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-		text = table.concat(lines, "\n")
-	elseif name:match("%.mmd$") or name:match("%.mermaid$") then
-		-- .mmd / .mermaid files: treat entire buffer as mermaid
-		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+	local name = vim.api.nvim_buf_get_name(bufnr):lower()
+	local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+	if name:match("%.mmd$") then
 		text = "```mermaid\n" .. table.concat(lines, "\n") .. "\n```\n"
+	elseif name:match("%.md$") then
+		text = table.concat(lines, "\n")
 	else
-		-- Other filetypes: extract mermaid block under cursor, wrap in code fence
-		local mermaid_text = extract_mermaid_under_cursor(bufnr)
-		text = "```mermaid\n" .. mermaid_text .. "\n```\n"
+		error("Only .md and .mmd files are supported")
 	end
 
 	return text
@@ -223,7 +200,6 @@ local function asset_context(bufnr)
 end
 
 local function initial_scroll(bufnr)
-	if M.config.initial_scroll == false then return nil end
 	local winid = vim.api.nvim_get_current_buf() == bufnr and vim.api.nvim_get_current_win()
 		or vim.fn.win_findbuf(bufnr)[1]
 	if not winid then return nil end
@@ -293,7 +269,7 @@ local function set_autocmds(s)
 	s.group = vim.api.nvim_create_augroup("MarkdownPreviewAuto", { clear = true })
 
 	if M.config.auto_refresh then
-		vim.api.nvim_create_autocmd(M.config.auto_refresh_events, {
+		vim.api.nvim_create_autocmd(AUTO_REFRESH_EVENTS, {
 			group = s.group,
 			callback = function(args)
 				if session == s and args.buf == s.bufnr then debounced_refresh(s) end
@@ -329,7 +305,7 @@ local function set_autocmds(s)
 			callback = function(args)
 				if session ~= s
 					or args.buf == s.bufnr
-					or vim.bo[args.buf].filetype ~= "markdown"
+					or not supported_file(args.buf)
 				then
 					return
 				end
@@ -456,7 +432,7 @@ function M.start()
 		vim.defer_fn(function()
 			s.open_pending = nil
 			if session == s and ls_server.connected_client_count(s.server) == 0 then
-				util.open_in_browser(s.url, M.config.browser)
+				browser.open(s.url, M.config.browser, { title = "Markdown Preview" })
 			end
 		end, 200)
 	end
