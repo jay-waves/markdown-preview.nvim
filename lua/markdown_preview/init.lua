@@ -1,8 +1,6 @@
 -- lua/markdown_preview/init.lua
 local util = require("markdown_preview.util")
-local ls_server = require("live_server.server")
-local ls_util = require("live_server.util")
-local browser = require("live_server.browser")
+local session_runtime = require("live_server.session")
 local html = require("live_server.html")
 
 local M = {}
@@ -185,7 +183,7 @@ local function update_document(s, bufnr, text, reset)
 		title = title,
 		initialScroll = position,
 	}
-	if s.server then ls_server.send_event(s.server, "reload") end
+	if s.preview then s.preview:send("reload") end
 end
 
 ---------------------------------------------------------------------------
@@ -216,7 +214,7 @@ local function send_scroll_sync(s)
 	s.last_scroll_line = cursor_line
 	local total = vim.api.nvim_buf_line_count(s.bufnr)
 	local payload = vim.json.encode({ line = cursor_line - 1, total = total })
-	ls_server.send_event(s.server, "scroll", payload)
+	if s.preview then s.preview:send("scroll", payload) end
 end
 
 ---------------------------------------------------------------------------
@@ -284,26 +282,6 @@ end
 -- Public API
 ---------------------------------------------------------------------------
 
--- When bound to 0.0.0.0 detect the outbound LAN IP via a UDP connect trick
--- (no packets are sent; it just lets the kernel pick the right interface).
-local function lan_ip()
-	local udp = vim.uv.new_udp()
-	if not udp then return "127.0.0.1" end
-	local ok = pcall(function() udp:connect("8.8.8.8", 80) end)
-	local addr = ok and udp:getsockname()
-	pcall(function() udp:close() end)
-	return (addr and addr.ip) or "127.0.0.1"
-end
-
--- Build the URL the browser opens to. Embeds the auth token when one exists
--- so the first request includes it (the page then stashes it in
--- sessionStorage for refreshes).
-local function browser_url(port, token)
-	local display_host = (M.config.host == "0.0.0.0") and lan_ip() or M.config.host
-	local base = ("http://%s:%d/"):format(display_host, port)
-	return base .. "?t=" .. token
-end
-
 local function scroll_nvim_to_line(s, line)
 	local bufnr = s.bufnr
 	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
@@ -329,23 +307,26 @@ function M.start()
 		vim.notify("Markdown Preview: " .. tostring(text), vim.log.levels.ERROR)
 		return
 	end
-	local s = session or { token = ls_util.random_token(16) }
+	local s = session or {}
 	update_document(s, bufnr, text, true)
 
 	-- Start the embedded preview server if not already running.
 	if not s.server then
 		local port = M.config.port
-		local index = render_index(s.token)
 		local asset_dir = vim.fs.dirname(assert(util.resolve_asset("index.html")))
-		local ok, inst = pcall(ls_server.start, {
+		s.token = s.token or session_runtime.token(16)
+		local index = render_index(s.token)
+		local ok, inst = pcall(session_runtime.start, {
 			port = port,
 			host = M.config.host,
 			root = asset_dir,
 			headers = { ["Cache-Control"] = "no-cache" },
 			live = { enabled = false, inject_script = false },
-			token = s.token,
+			browser = M.config.browser,
+			browser_title = "Markdown Preview",
 			routes = {
 				["/"] = function()
+					if not index then return "Preview is not ready", 503 end
 					return index, 200, { ["Content-Type"] = "text/html; charset=utf-8" }
 				end,
 				["/document"] = function()
@@ -373,8 +354,10 @@ function M.start()
 			)
 			return
 		end
-		s.server = inst
-		s.url = browser_url(inst.port, s.token)
+		s.preview = inst
+		s.server = inst.server
+		s.token = inst.token
+		s.url = inst.url
 		session = s
 		set_autocmds(s)
 
@@ -384,12 +367,12 @@ function M.start()
 	end
 	-- Coalesce open requests and discard callbacks belonging to a stopped session.
 	if session == s and M.config.open_browser and not s.open_pending
-		and ls_server.connected_client_count(s.server) == 0 then
+			and not s.preview:connected() then
 		s.open_pending = true
 		vim.defer_fn(function()
 			s.open_pending = nil
-			if session == s and ls_server.connected_client_count(s.server) == 0 then
-				browser.open(s.url, M.config.browser, { title = "Markdown Preview" })
+			if session == s and not s.preview:connected() then
+				s.preview:open()
 			end
 		end, 200)
 	end
@@ -407,16 +390,7 @@ function M.stop()
 		vim.api.nvim_del_augroup_by_id(s.group)
 	end
 	if s.server then
-		local instance = s.server
-		pcall(ls_server.send_event, instance, "markdown-preview-close", "{}")
-		-- stop() closes sockets immediately. Allow the close event to flush,
-		-- including during VimLeavePre, but never wait indefinitely for a tab.
-		if ls_server.connected_client_count(instance) > 0 then
-			vim.wait(100, function()
-				return ls_server.connected_client_count(instance) == 0
-			end, 10)
-		end
-		pcall(ls_server.stop, instance)
+		if s.preview then s.preview:stop(true, "markdown-preview-close") end
 	end
 
 	if type(M.config.hooks.on_stop) == "function" then
