@@ -6,11 +6,11 @@
 html[data-theme="light"] {
   --md-fg: #292929;
   --md-bg: #ffffff;
-  --md-muted: #59636e;
-  --md-border: #d1d9e0;
-  --md-border-muted: #d1d9e0b3;
-  --md-link: #0969da;
-  --md-accent: #0969da;
+  --md-muted: #555;
+  --md-border: #ddd;
+  --md-border-muted: #ddd;
+  --md-link: #111;
+  --md-accent: #111;
   --md-mark-bg: #fff8c5;
   --md-kbd-bg: #f6f8fa;
   --md-table-alt-bg: #f6f8fa;
@@ -24,38 +24,15 @@ html[data-theme="light"] {
   --md-alert-tip: #1a7f37;
   --md-font-serif: "Noto Serif", "Noto Serif CJK SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
   --md-font-sans: "Noto Sans", "Noto Sans CJK SC", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --md-font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --md-font: var(--md-font-serif);
   color-scheme: light;
 }
-
-html[data-theme="dark"] {
-  --md-fg: #f0f6fc;
-  --md-bg: #212830;
-  --md-muted: #9198a1;
-  --md-border: #3d444d;
-  --md-border-muted: #3d444db3;
-  --md-link: #478be6;
-  --md-accent: #478be6;
-  --md-mark-bg: #ae7c1426;
-  --md-kbd-bg: #262c36;
-  --md-table-alt-bg: #262c36;
-  --md-quote-bg: #262c36;
-  --md-code-bg: #656c7633;
-  --md-code-fg: #c9d1d9;
-  --md-pre-bg: #262c36;
-  --md-danger: #e5534b;
-  --md-alert-important: #986ee2;
-  --md-alert-warning: #c69026;
-  --md-alert-tip: #57ab5a;
-  color-scheme: dark;
-}
 /*light */
 #content {
-  min-width: 0;
   margin: 0;
+  width: 100%;
   max-width: none;
-  padding: 0 40px 32px;
+  padding: 0 0 80px;
   -ms-text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
   font-weight: 400;
@@ -63,16 +40,8 @@ html[data-theme="dark"] {
   background-color: var(--md-bg);
   font-family: var(--md-font);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.6;
   word-wrap: break-word;
-}
-
-/* The document column is intentionally narrower than the full preview so the
- * side columns can hold navigation and footnotes without crowding the prose. */
-@media (max-width: 768px) {
-  #content {
-    padding: 1rem 1rem 3rem;
-  }
 }
 
 #content details,
@@ -91,8 +60,9 @@ html[data-theme="dark"] {
 
 #content a {
   background-color: rgba(0,0,0,0);
-  color: var(--md-accent);
-  text-decoration: none;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: .18em;
 }
 
 #content abbr[title] {
@@ -112,7 +82,6 @@ html[data-theme="dark"] {
 
 #content h1 {
   margin: .67em 0;
-  font-weight: 500;
   padding-bottom: .3em;
   font-size: 1.6em;
   border-bottom: 1px solid var(--md-border-muted);
@@ -145,6 +114,7 @@ html[data-theme="dark"] {
 
 #content img {
   border-style: none;
+  border-radius: 18px;
   max-width: 50%;
   height: auto;
   box-sizing: content-box;
@@ -154,7 +124,7 @@ html[data-theme="dark"] {
 #content kbd,
 #content pre,
 #content samp {
-  font-family: var(--md-font-mono);
+  font-family: "Fira Code", monospace;
   font-weight: 400;
   font-size: 12px;
 }
@@ -247,8 +217,6 @@ html[data-theme="dark"] {
   max-width: 100%;
   overflow: auto;
   font-variant: tabular-nums;
-  font-size: .875rem;
-  text-align: left;
 }
 
 #content td,
@@ -314,6 +282,7 @@ html[data-theme="dark"] {
 #content h4,
 #content h5,
 #content h6 {
+  color: var(--md-fg);
   font-family: var(--md-font-sans);
   margin-top: 1.5rem;
   margin-bottom: 1rem;
@@ -322,31 +291,25 @@ html[data-theme="dark"] {
 }
 
 #content h2 {
-  font-weight: 500;
   padding-bottom: .3em;
   font-size: 1.25em;
   border-bottom: 1px solid var(--md-border-muted);
 }
 
 #content h3 {
-  font-weight: 500;
   font-size: 1.1em;
 }
 
 #content h4 {
-  font-weight: 500;
   font-size: 1em;
 }
 
 #content h5 {
-  font-weight: 500;
   font-size: 1em;
 }
 
 #content h6 {
-  font-weight: 500;
   font-size: 1em;
-  color: var(--md-muted);
 }
 
 #content p {
@@ -389,7 +352,7 @@ html[data-theme="dark"] {
 #content tt,
 #content code,
 #content samp {
-  font-family: var(--md-font-mono);
+  font-family: "Fira Code", monospace;
   font-weight: 400;
   font-size: 12px;
 }
@@ -397,7 +360,7 @@ html[data-theme="dark"] {
 #content pre {
   margin-top: 0;
   margin-bottom: 0;
-  font-family: var(--md-font-mono);
+  font-family: "Fira Code", monospace;
   font-weight: 400;
   font-size: 12px;
   word-wrap: normal;
@@ -434,8 +397,6 @@ html[data-theme="dark"] {
   margin-bottom: 1rem;
 }
 
-/* Quotations are document-level blocks rather than body paragraphs. Give
- * them the same independent vertical rhythm as fenced code. */
 #content blockquote {
   margin: 1.25rem 0;
 }
@@ -524,6 +485,11 @@ html[data-theme="dark"] {
   border-top: 1px solid var(--md-border-muted);
 }
 
+#content table {
+  font-size: .875rem;
+  text-align: left;
+}
+
 #content table td>:last-child {
   margin-bottom: 0;
 }
@@ -605,7 +571,7 @@ html[data-theme="dark"] {
   padding: 1rem;
   overflow: auto;
   font-size: 12px;
-  font-family: var(--md-font-mono);
+  font-family: "Fira Code", monospace;
   line-height: 1.45;
   border-radius: 6px;
 }
@@ -618,7 +584,7 @@ html[data-theme="dark"] {
   padding: 0;
   margin: 0;
   overflow: visible;
-  font-family: var(--md-font-mono);
+  font-family: "Fira Code", monospace;
   font-size: 12px;
   line-height: inherit;
   word-wrap: normal;
@@ -648,7 +614,7 @@ html[data-theme="dark"] {
 #content .footnotes {
   font-size: 12px;
   color: var(--md-muted);
-  border-top: 0;
+  border-top: 1px solid var(--md-border);
 }
 
 #content .footnotes ol {
@@ -681,7 +647,6 @@ html[data-theme="dark"] {
   color: var(--md-fg);
 }
 
-/* Footnotes moved into the right reading rail. */
 #content .footnotes {
   border-top: 0 !important;
 }
@@ -694,8 +659,10 @@ html[data-theme="dark"] {
   position: relative;
   max-height: none;
   overflow: visible;
-  font-family: var(--md-font);
   padding: 0 1rem 32px;
+  color: var(--md-muted);
+  font-family: var(--md-font);
+  font-size: .78rem;
 }
 
 #footnotes .footnotes {
@@ -718,19 +685,6 @@ html[data-theme="dark"] {
   right: 0;
   margin: 0;
   padding: 0 1rem;
-}
-
-#footnotes .footnote-backref {
-  color: var(--md-muted);
-  opacity: .35;
-  text-decoration: none;
-  transition: color .15s, opacity .15s;
-}
-
-#footnotes .footnote-backref:hover,
-#footnotes .footnote-backref:focus-visible {
-  color: var(--md-fg);
-  opacity: .65;
 }
 
 #content [role=button]:focus:not(:focus-visible),

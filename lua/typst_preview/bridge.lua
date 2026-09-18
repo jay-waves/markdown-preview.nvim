@@ -18,8 +18,11 @@ function M.start(upstream, callbacks)
                 return self.html, 200, { ["Content-Type"] = "text/html; charset=utf-8" }
             end,
         },
-        on_event = function(event)
-            if not self.stopped and event == "typst-connected" then callbacks.connected() end
+        on_event = function(event, data)
+            if self.stopped then return end
+            if event == "typst-connected" then callbacks.connected()
+            elseif event == "typst-outline-jump" then callbacks.outline_jump(data)
+            elseif event == "typst-preview-jump" then callbacks.preview_jump() end
         end,
         browser_title = "Typst Preview",
     })
@@ -37,6 +40,12 @@ function M.start(upstream, callbacks)
     end
     function self:follow()
         instance:send("typst-follow", "{}")
+    end
+    function self:outline(value)
+        instance:send("typst-outline", vim.json.encode(value))
+    end
+    function self:cursor(line)
+        instance:send("typst-cursor", vim.json.encode({ line = line }))
     end
     function self:open()
         if self.stopped or not self.html or self:connected() then return end
@@ -58,6 +67,7 @@ function M.start(upstream, callbacks)
         local origin = ("http://127.0.0.1:%d"):format(instance.server.port)
         local config = vim.json.encode({ upstream = upstream, origin = origin, token = instance.token })
         local injection = html_util.tag("base", { href = upstream })
+            .. html_util.tag("link", { rel = "stylesheet", href = origin .. "/typst-preview.css?t=" .. instance.token })
             .. html_util.tag("script", nil, "window.__typstBridge=" .. config .. ";")
             .. html_util.tag("script", { src = origin .. "/typst-inject.js?t=" .. instance.token }, "")
         local document, inserted = html_util.prepend_to(result.stdout, "head", injection)

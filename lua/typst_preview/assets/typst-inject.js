@@ -8,7 +8,76 @@
   const positions = new Map();
   const hooked = new WeakSet();
   let bufferId, restoring;
+  let latestOutline;
+  let cursorLine = -1;
   const scroller = () => document.getElementById("typst-container-main");
+
+  function setupOutline() {
+    if (document.getElementById("typst-outline")) return;
+    const dialog = document.createElement("dialog");
+    dialog.id = "typst-outline"; dialog.setAttribute("aria-label", "Document outline");
+    dialog.innerHTML = "<nav></nav>";
+    dialog.onclick = event => { if (event.target === dialog) dialog.close(); };
+    const menu = document.createElement("div");
+    menu.id = "typst-context-menu";
+    menu.hidden = true;
+    menu.innerHTML = "<button data-action=copy>Copy</button><button data-action=refresh>Refresh</button><button data-action=outline>Outline</button>";
+    document.body.append(dialog, menu);
+    const closeMenu = () => { menu.hidden = true; };
+    document.addEventListener("contextmenu", event => {
+      event.preventDefault();
+      menu.hidden = false;
+      menu.style.left = `${Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)}px`;
+      menu.style.top = `${Math.min(event.clientY, innerHeight - menu.offsetHeight - 8)}px`;
+    });
+    document.addEventListener("pointerdown", event => {
+      if (!menu.hidden && !event.target.closest("#typst-context-menu")) closeMenu();
+    });
+    menu.addEventListener("click", async event => {
+      const action = event.target.closest("button")?.dataset.action;
+      if (!action) return;
+      closeMenu();
+      if (action === "refresh") return location.reload();
+      if (action === "outline") {
+        dialog.showModal();
+        return;
+      }
+      const selected = getSelection()?.toString() || "";
+      if (!selected) return;
+      const text = selected
+        .replace(/\r\n?/g, "\n")
+        .split(/\n\s*\n/)
+        .map(block => block.replace(/\s*\n\s*/g, " ").replace(/[ \t]{2,}/g, " ").trim())
+        .filter(Boolean)
+        .join("\n\n");
+      await navigator.clipboard?.writeText(text);
+    });
+    window.addEventListener("typst-outline", event => {
+      const nav = dialog.querySelector("nav"); nav.replaceChildren();
+      const flatten = (items, level = 0) => (items || []).flatMap(item => [
+        { ...item, level }, ...flatten(item.children, level + 1),
+      ]);
+      const items = flatten(event.detail?.symbols || []).filter(item => item.isHeading === true);
+      if (!items.length) {
+        const empty = document.createElement("div");
+        empty.textContent = "No headings";
+        empty.style.cssText = "padding:10px 8px;color:#57606a";
+        nav.append(empty);
+      }
+      items.forEach(item => {
+        const range = item.range || item.selectionRange;
+        const line = range?.start?.line;
+        if (typeof line !== "number" || !item.name) return;
+        const button = document.createElement("button");
+        button.textContent = item.name; button.style.setProperty("--outline-level", item.level);
+        button.dataset.line = String(line);
+        button.onclick = () => { fetch(endpoint("/__live/event?event=typst-outline-jump&data=" + encodeURIComponent(JSON.stringify({ line })))).catch(console.error); dialog.close(); };
+        nav.append(button);
+      });
+      updateOutlineActive();
+    });
+    if (latestOutline) window.dispatchEvent(new CustomEvent("typst-outline", { detail: latestOutline }));
+  }
 
   function remember() {
     const el = scroller();
@@ -39,6 +108,7 @@
       hooked.add(container);
       const jump = container.handleTypstLocation;
       container.handleTypstLocation = function (...args) {
+        fetch(endpoint("/__live/event?event=typst-preview-jump")).catch(console.error);
         if (restoring === undefined) return jump.apply(this, args);
       };
     }
@@ -91,6 +161,7 @@
   };
 
   window.addEventListener("DOMContentLoaded", () => {
+    setupOutline();
     // Isolate the status styling from Tinymist's own stylesheet.
     const host = document.createElement("div");
     host.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647";
@@ -119,6 +190,27 @@
     } catch (error) { console.error(error); }
   });
   events.addEventListener("typst-follow", follow);
+  events.addEventListener("typst-outline", event => {
+    try {
+      latestOutline = JSON.parse(event.data);
+      window.dispatchEvent(new CustomEvent("typst-outline", { detail: latestOutline }));
+    }
+    catch (error) { console.error(error); }
+  });
+  function updateOutlineActive() {
+    const buttons = document.querySelectorAll("#typst-outline button[data-line]");
+    let active;
+    buttons.forEach(button => {
+      if (Number(button.dataset.line) <= cursorLine) active = button;
+      button.classList.remove("is-active");
+    });
+    active?.classList.add("is-active");
+    if (active && document.getElementById("typst-outline")?.open) active.scrollIntoView({ block: "nearest" });
+  }
+  events.addEventListener("typst-cursor", event => {
+    try { cursorLine = JSON.parse(event.data).line; updateOutlineActive(); }
+    catch (error) { console.error(error); }
+  });
   events.addEventListener("typst-close", () => {
     if (ended) return;
     ended = true;

@@ -78,7 +78,26 @@ local function sync_page(s, bufnr)
     if session ~= s or not s.page or not s.page:prepared() then return end
     local name = vim.api.nvim_buf_get_name(bufnr)
     s.cursor = vim.api.nvim_win_get_cursor(0)
+    s.page:cursor(s.cursor[1] - 1)
+    s.bufnr = bufnr
     s.page:buffer({ id = vim.uri_from_bufnr(bufnr), title = name ~= "" and vim.fn.fnamemodify(name, ":t") or "Typst Preview" })
+    local ok, result = pcall(s.client.request, s.client, "textDocument/documentSymbol",
+        { textDocument = { uri = vim.uri_from_bufnr(bufnr) } }, function(err, symbols)
+            if session ~= s or not s.page or err then return end
+            local function mark_headings(items)
+                for _, item in ipairs(items or {}) do
+                    local range = item.range or item.selectionRange
+                    local line = range and range.start and range.start.line
+                    local text = type(line) == "number"
+                        and vim.api.nvim_buf_get_lines(bufnr, line, line + 1, false)[1]
+                    item.isHeading = type(text) == "string" and text:match("^%s*=+%s+") ~= nil
+                    mark_headings(item.children)
+                end
+            end
+            mark_headings(symbols or {})
+            s.page:outline({ symbols = symbols or {} })
+        end, bufnr)
+    if not ok then notify("Document Symbols request failed: " .. tostring(result)) end
     focus(s.client, bufnr)
     schedule_scroll(s)
 end
@@ -137,6 +156,21 @@ function M.start()
             connected = function()
                 if current_client() == s.client then sync_page(s, vim.api.nvim_get_current_buf()) end
             end,
+            outline_jump = function(data)
+                local ok, value = pcall(vim.json.decode, data or "")
+                local line = ok and type(value) == "table" and value.line
+                if type(line) == "number" and s.bufnr and vim.api.nvim_buf_is_valid(s.bufnr) then
+                    local wins = vim.fn.win_findbuf(s.bufnr)
+                    if #wins > 0 then
+                        local row = math.max(1, math.min(vim.api.nvim_buf_line_count(s.bufnr), line + 1))
+                        pcall(vim.api.nvim_win_set_cursor, wins[1], { row, 0 })
+                        pcall(vim.api.nvim_win_call, wins[1], function() vim.cmd("normal! zz") end)
+                    end
+                end
+            end,
+            preview_jump = function()
+                s.suppress_follow = true
+            end,
             ready = function(prepare_err)
                 if session ~= s then return end
                 if prepare_err then M.stop(); return notify("Preview injection failed: " .. prepare_err) end
@@ -164,16 +198,25 @@ function M.setup()
     vim.api.nvim_create_user_command("TypstPreview", M.start, { desc = "Start or reopen Typst preview" })
     vim.api.nvim_create_user_command("TypstPreviewStop", M.stop, { desc = "Stop Typst preview" })
     local group = vim.api.nvim_create_augroup("TypstPreview", { clear = true })
-    vim.api.nvim_create_autocmd({ "BufEnter", "CursorMoved", "InsertLeave", "BufLeave" }, {
+    vim.api.nvim_create_autocmd({ "BufEnter", "CursorMoved", "InsertLeave", "BufLeave", "TextChanged", "TextChangedI" }, {
         group = group, pattern = "*.typ",
         callback = function(args)
             local s = session
             if not s then return end
             if args.event == "BufLeave" then return cancel_scroll(s) end
+            if args.event == "TextChanged" or args.event == "TextChangedI" then
+                if args.buf == s.bufnr and current_client() == s.client then sync_page(s, args.buf) end
+                return
+            end
             if args.event ~= "BufEnter" then
                 local cursor = vim.api.nvim_win_get_cursor(0)
                 if vim.deep_equal(cursor, s.cursor) then return end
                 s.cursor = cursor
+                if s.suppress_follow then
+                    s.suppress_follow = nil
+                    return
+                end
+                if s.page then s.page:cursor(cursor[1] - 1) end
                 if s.page then s.page:follow() end
                 return schedule_scroll(s)
             end
