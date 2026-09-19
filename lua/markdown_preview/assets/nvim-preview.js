@@ -79,66 +79,7 @@
         });
     }
 
-    function updateFootnotes(footnotes) {
-        const aside = document.getElementById('footnotes');
-        if (!aside) return;
-        aside.replaceChildren();
-        if (footnotes) aside.append(footnotes);
-        aside.hidden = !footnotes;
-    }
-
-    function expandFootnotes(contentEl) {
-        const list = document.querySelector('#footnotes .footnotes ol');
-        if (!list) return;
-
-        const expanded = [];
-        Array.from(list.children).forEach(item => {
-            if (!item.id) return;
-            const target = `#${item.id}`;
-            const references = Array.from(contentEl.querySelectorAll('a[href]'))
-                .filter(link => link.getAttribute('href') === target);
-            const copies = references.length ? references : [null];
-            copies.forEach(reference => {
-                const copy = item.cloneNode(true);
-                copy.removeAttribute('id');
-                copy.dataset.footnoteTarget = item.id;
-                if (reference?.id) copy.dataset.footnoteReferenceId = reference.id;
-                expanded.push(copy);
-            });
-        });
-        list.replaceChildren(...expanded);
-    }
-
-    function layoutFootnotes(contentEl) {
-        const aside = document.getElementById('footnotes');
-        const footnotes = aside?.querySelector('.footnotes');
-        if (!aside || !footnotes) return;
-
-        const contentRect = contentEl.getBoundingClientRect();
-        const asideRect = aside.getBoundingClientRect();
-        aside.style.minHeight = `${Math.max(contentEl.scrollHeight, window.innerHeight)}px`;
-
-        let previousBottom = 0;
-        footnotes.querySelectorAll('li[data-footnote-target]').forEach(item => {
-            const reference = item.dataset.footnoteReferenceId
-                ? document.getElementById(item.dataset.footnoteReferenceId)
-                : null;
-            if (!reference) return;
-
-            const referenceRect = reference.getBoundingClientRect();
-            const desiredTop = referenceRect.top - asideRect.top;
-            const top = Math.max(0, desiredTop, previousBottom + 12);
-            item.style.setProperty('top', `${top}px`, 'important');
-            previousBottom = top + item.getBoundingClientRect().height;
-        });
-    }
-
     function prepareSidebars(rootEl) {
-        const footnotes = rootEl.querySelector('.footnotes');
-        rootEl.querySelectorAll('.footnotes-sep').forEach(separator => separator.remove());
-        if (footnotes) footnotes.remove();
-        updateFootnotes(footnotes);
-        expandFootnotes(rootEl);
         tocCall('refresh', rootEl);
     }
 
@@ -219,10 +160,7 @@
             }
 
             applyBottomPadding(core.contentElement);
-            layoutFootnotes(core.contentElement);
             await core.renderMermaid();
-            layoutFootnotes(core.contentElement);
-            requestAnimationFrame(() => layoutFootnotes(core.contentElement));
             requestAnimationFrame(() => tocCall('refresh'));
             requestAnimationFrame(() => tocCall('updateActive', undefined, true));
             applyInitialScroll(core.contentElement, value.initialScroll);
@@ -326,7 +264,6 @@
         window.addEventListener('touchmove', pauseScrollSync, { passive: true });
         window.addEventListener('resize', () => {
             applyBottomPadding(core.contentElement);
-            layoutFootnotes(core.contentElement);
         });
 
         core.contentElement.addEventListener('click', event => {

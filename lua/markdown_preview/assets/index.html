@@ -78,7 +78,7 @@
             min-height: 100%;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 900px) minmax(250px, 1fr);
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1200px);
             gap: 1.5rem;
             align-items: start;
         }
@@ -97,12 +97,6 @@
 
         body.toc-open {
             overflow: hidden;
-        }
-
-        #footnotes {
-            grid-column: 3;
-            width: 100%;
-            justify-self: stretch;
         }
 
         .preview-sidebar {
@@ -207,16 +201,12 @@
 
         @media (max-width: 1100px) {
             .preview-layout {
-                grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
+                grid-template-columns: minmax(0, 1fr);
                 gap: .75rem;
             }
 
             #content {
                 grid-column: 1;
-            }
-
-            #footnotes {
-                grid-column: 2;
             }
 
             #toc-trigger {
@@ -229,8 +219,7 @@
                 display: block;
             }
 
-            #content,
-            #footnotes {
+            #content {
                 grid-column: auto;
                 width: auto;
             }
@@ -659,8 +648,6 @@
         <aside id="toc-trigger" class="preview-sidebar" role="button" tabindex="0"
             aria-label="打开文档目录"></aside>
         <main id="content" style="display:none"></main>
-        <aside id="footnotes" class="preview-sidebar" aria-label="Footnotes">
-        </aside>
     </div>
 
     <dialog id="toc-dialog" class="toc-dialog" aria-label="Table of contents" tabindex="-1">
@@ -685,6 +672,7 @@
     <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-emoji@3.0.0/dist/markdown-it-emoji.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js"></script>
+    <script src="sidenotes.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js"></script>
     <script src="https://unpkg.com/markdown-it-anchor@9.2.0/dist/markdownItAnchor.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js"></script>
@@ -877,6 +865,7 @@
         md.use(markdownItGithubAlerts);
         if (window.markdownitEmoji) md.use(window.markdownitEmoji);
         if (window.markdownitFootnote) md.use(window.markdownitFootnote);
+        if (window.markdownitFootnote) md.use(window.markdownItSidenotes);
         if (window.markdownitTaskLists) md.use(window.markdownitTaskLists, { enabled: false });
         if (window.markdownItAnchor) {
             md.use(window.markdownItAnchor, {

@@ -58,7 +58,7 @@ html[data-theme="dark"] {
   padding: 0 40px 32px;
   -ms-text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
-  font-weight: 400;
+  font-weight: 450;
   color: var(--md-fg);
   background-color: var(--md-bg);
   font-family: var(--md-font);
@@ -67,8 +67,7 @@ html[data-theme="dark"] {
   word-wrap: break-word;
 }
 
-/* The document column is intentionally narrower than the full preview so the
- * side columns can hold navigation and footnotes without crowding the prose. */
+/* Keep the document and its sidenotes in the same layout. */
 @media (max-width: 768px) {
   #content {
     padding: 1rem 1rem 3rem;
@@ -556,13 +555,20 @@ html[data-theme="dark"] {
 
 #content code,
 #content tt {
-  padding: .2em .4em;
+  padding: 0 .4em;
   margin: 0;
   font-size: 12px;
+  line-height: inherit;
   white-space: break-spaces;
   color: var(--md-code-fg);
   background-color: var(--md-code-bg);
   border-radius: 6px;
+}
+
+/* Keep the inline-code background on the prose baseline. */
+#content :not(pre) > code,
+#content :not(pre) > tt {
+  vertical-align: 0.1em;
 }
 
 #content code br,
@@ -610,6 +616,14 @@ html[data-theme="dark"] {
   border-radius: 6px;
 }
 
+/* Code-frame chrome belongs to the document theme; highlight.css only owns
+ * syntax-token colors. */
+#content pre:has(> code[class*="language-"]),
+#content pre.hljs {
+  background-color: color-mix(in srgb, var(--md-bg) 98%, var(--md-muted));
+  border: 1px solid color-mix(in srgb, var(--md-border) 78%, transparent);
+}
+
 #content pre code,
 #content pre tt,
 #content pre span,
@@ -645,92 +659,72 @@ html[data-theme="dark"] {
   content: "]";
 }
 
-#content .footnotes {
-  font-size: 12px;
-  color: var(--md-muted);
-  border-top: 0;
+/* A Tufte-style reading grid using semantic asides. Heading sections keep
+ * their own grid so collapsing a section also hides its notes. */
+#content,
+#content .heading-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 28%);
+  column-gap: 1.5rem;
+  align-content: start;
 }
 
-#content .footnotes ol {
-  padding-left: 1rem;
+#content > :not(aside),
+#content .heading-content > :not(aside) {
+  grid-column: 1;
+  min-width: 0;
 }
 
-#content .footnotes ol ul {
-  display: inline-block;
-  padding-left: 1rem;
-  margin-top: 1rem;
+#content section.heading-section,
+#content .heading-content,
+#content .heading-summary {
+  grid-column: 1 / -1;
 }
 
-#content .footnotes li {
+/* Keep heading separators aligned with the full prose column. */
+#content .heading-summary > :is(h1, h2),
+#content > :is(h1, h2) {
   position: relative;
+  border-bottom: 0;
 }
 
-#content .footnotes li:target::before {
+#content .heading-summary > :is(h1, h2)::after,
+#content > :is(h1, h2)::after {
   position: absolute;
-  top: calc(0.5rem*-1);
-  right: calc(0.5rem*-1);
-  bottom: calc(0.5rem*-1);
-  left: calc(1.5rem*-1);
-  pointer-events: none;
-  content: "";
-  border: 2px solid var(--md-accent);
-  border-radius: 6px;
-}
-
-#content .footnotes li:target {
-  color: var(--md-fg);
-}
-
-/* Footnotes moved into the right reading rail. */
-#content .footnotes {
-  border-top: 0 !important;
-}
-
-#content .footnotes-sep {
-  display: none !important;
-}
-
-#footnotes {
-  position: relative;
-  max-height: none;
-  overflow: visible;
-  font-family: var(--md-font);
-  padding: 0 1rem 32px;
-}
-
-#footnotes .footnotes {
-  position: relative;
-  width: min(100%, 240px);
-  margin: 0 auto;
-  padding: 0;
-  border-top: 0;
-}
-
-#footnotes .footnotes ol {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-#footnotes .footnotes li {
-  position: absolute;
+  right: auto;
+  bottom: 0;
   left: 0;
-  right: 0;
-  margin: 0;
-  padding: 0 1rem;
+  width: 100%;
+  height: 1px;
+  content: "";
+  background-color: var(--md-border-muted);
 }
 
-#footnotes .footnote-backref {
+/* A figure directly in the document spans both columns; figures in a
+ * section stay with its prose, and figures inside an aside stay in the rail. */
+#content > figure { grid-column: 1 / -1; }
+
+#content > aside,
+#content .heading-content > aside {
+  grid-column: 2;
+  min-width: 0;
+  margin: 0 0 1rem;
   color: var(--md-muted);
-  opacity: .35;
-  text-decoration: none;
-  transition: color .15s, opacity .15s;
+  font-size: .8rem;
+  align-self: start;
 }
 
-#footnotes .footnote-backref:hover,
-#footnotes .footnote-backref:focus-visible {
-  color: var(--md-fg);
-  opacity: .65;
+#content > aside > :first-child,
+#content .heading-content > aside > :first-child { margin-top: 0; }
+#content aside:target { color: var(--md-fg); }
+#content aside figure { max-width: 100%; }
+#content figure { min-width: 0; max-width: 100%; }
+
+@media (max-width: 768px) {
+  #content,
+  #content .heading-content { grid-template-columns: minmax(0, 1fr); }
+  #content > aside,
+  #content .heading-content > aside { grid-column: 1; padding-left: 1rem; }
 }
 
 #content [role=button]:focus:not(:focus-visible),

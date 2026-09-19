@@ -16,6 +16,7 @@ require("typst_preview").setup()
 Commands:
 
 - `:MarkdownPreview`, `:MarkdownPreviewStop`
+- `:HtmlPreview`, `:HtmlPreviewStop`
 - `:TypstPreview`, `:TypstPreviewStop`
 
 Typst requires Tinymist 0.15.2 or newer on `PATH`. Its LSP remains responsible for compilation and source mapping; the bundled `typst_preview` module supplies the browser wrapper and cursor-following bridge. `:TypstPreviewStop` stops the preview task and calls `tinymist.doClearCache` to release Tinymist's memoized analysis resources.
@@ -27,6 +28,10 @@ zooming or repagination. Restoration uses Tinymist's internal SVG renderer hooks
 document compilations are not identified by file in that interface.
 
 Markdown options are configured through `markdown_preview.setup()`. Each module keeps its browser assets in its own `assets` directory under `lua/markdown_preview` or `lua/typst_preview`.
+
+`HtmlPreview` opens the current `.html` or `.htm` buffer through the local live
+server. Saving the file reloads the browser, so changes to the document title
+are reflected automatically. It intentionally does not provide scroll sync.
 
 Set `custom_css` to a CSS file path, or a list of paths, to add styles after the bundled theme. The default `""` uses only the bundled styles.
 
