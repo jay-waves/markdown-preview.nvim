@@ -1,6 +1,7 @@
 local M = {}
 local bridge = require("typst_preview.bridge")
 local session, exiting, configured
+local PREVIEW_JUMP_GRACE_NS = 500000000
 
 local function notify(message)
     if not exiting then vim.notify(message, vim.log.levels.ERROR, { title = "Typst Preview" }) end
@@ -169,7 +170,10 @@ function M.start()
                 end
             end,
             preview_jump = function()
-                s.suppress_follow = true
+                -- Tinymist moves the editor cursor as a consequence of the
+                -- preview click. Ignore that one CursorMoved event; a later
+                -- movement is a real editor action and should follow again.
+                s.suppress_follow_until = vim.uv.hrtime() + PREVIEW_JUMP_GRACE_NS
             end,
             ready = function(prepare_err)
                 if session ~= s then return end
@@ -212,9 +216,10 @@ function M.setup()
                 local cursor = vim.api.nvim_win_get_cursor(0)
                 if vim.deep_equal(cursor, s.cursor) then return end
                 s.cursor = cursor
-                if s.suppress_follow then
-                    s.suppress_follow = nil
-                    return
+                if s.suppress_follow_until then
+                    local suppressed = vim.uv.hrtime() <= s.suppress_follow_until
+                    s.suppress_follow_until = nil
+                    if suppressed then return end
                 end
                 if s.page then s.page:cursor(cursor[1] - 1) end
                 if s.page then s.page:follow() end

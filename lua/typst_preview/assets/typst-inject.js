@@ -61,7 +61,7 @@
       if (!items.length) {
         const empty = document.createElement("div");
         empty.textContent = "No headings";
-        empty.style.cssText = "padding:10px 8px;color:#57606a";
+        empty.className = "typst-outline-empty";
         nav.append(empty);
       }
       items.forEach(item => {

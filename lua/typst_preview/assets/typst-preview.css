@@ -10,10 +10,12 @@
   box-shadow: 0 8px 24px #0002;
   backdrop-filter: blur(18px) saturate(125%);
   font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light dark;
 }
 
 #typst-outline::backdrop { background: transparent; }
 #typst-outline nav { padding: 6px; }
+#typst-outline .typst-outline-empty { padding: 10px 8px; color: color-mix(in srgb, CanvasText 62%, transparent); }
 #typst-outline button {
   display: block;
   width: 100%;
@@ -55,6 +57,7 @@
   box-shadow: 0 6px 18px #0002;
   backdrop-filter: blur(18px) saturate(125%);
   font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light dark;
 }
 #typst-context-menu button {
   display: block;
@@ -67,4 +70,19 @@
   padding: 6px 9px;
   font: inherit;
   cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  #typst-outline,
+  #typst-context-menu {
+    border-color: color-mix(in srgb, CanvasText 18%, transparent);
+    box-shadow: 0 8px 24px #0006;
+  }
+
+  #typst-outline button:hover,
+  #typst-outline button:focus-visible,
+  #typst-context-menu button:hover,
+  #typst-context-menu button:focus-visible {
+    background: color-mix(in srgb, CanvasText 12%, transparent);
+  }
 }

@@ -210,6 +210,16 @@ end
 local function send_scroll_sync(s)
 	if not M.config.scroll_sync then return end
 	local cursor_line = vim.api.nvim_win_get_cursor(0)[1] -- 1-based
+	local pending = s.suppress_scroll_sync
+	if pending then
+		-- A preview click changes the Neovim cursor programmatically. Consume
+		-- that CursorMoved event instead of sending the click back to the page.
+		s.suppress_scroll_sync = nil
+		if pending.bufnr == s.bufnr and pending.line == cursor_line then
+			s.last_scroll_line = cursor_line
+			return
+		end
+	end
 	if cursor_line == s.last_scroll_line then return end
 	s.last_scroll_line = cursor_line
 	local total = vim.api.nvim_buf_line_count(s.bufnr)
@@ -294,6 +304,7 @@ local function scroll_nvim_to_line(s, line)
 	end
 	local last_line = vim.api.nvim_buf_line_count(bufnr)
 	local target = math.max(1, math.min(last_line, line + 1))
+	s.suppress_scroll_sync = { bufnr = bufnr, line = target }
 	pcall(vim.api.nvim_win_set_cursor, winid, { target, 0 })
 	pcall(vim.api.nvim_win_call, winid, function()
 		vim.cmd("normal! zz")
